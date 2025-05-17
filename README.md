@@ -12,7 +12,8 @@ Onaylayınca waypointler de harita üzerinde gösterilsin. Drone kontrolü için
 olsun drone. "Başlat" ile alanda gezinsin ve geri kalkış noktasına dönsün. Periyot bitimine kadar beklesin ve yeni
 periyot ile tekrar hareket etsin. Her periyotta plakalar ve araç konumları listelensin. Plakaların raporlanması, 
 başlangıç için bir .txt dosyası aracılığı ile olabilir. Her periyot için bir dosya oluşturulur. "Hizmet alanı" şimdilik
-bir config dosyası ile belirlenen koordinat ve yarıçap ile gösterilsin. 
+bir config dosyası ile belirlenen koordinat ve yarıçap ile gösterilsin. Tespit edilen araçlar da harita üzerinde işaretlenebilir.
+Belki plaka okuma başarı durumuna göre "yeşil veya kırmızı" işaretleme yapılabilir.
 
 WebUI basit bir şekilde Flask ile gerçekleştirilebilir. Server, duruma göre ROS ile iletişime geçer. Bir de her şeyi 
 çalıştıracak bir .launch dosyası lazım. ROS için Ardupilot veya PX4 ile Mavros kullanımı büyük kolaylık sağlar. SITL
@@ -45,4 +46,9 @@ yan yanaysa? Bir park yeri gibi. Araç sayısı ile özgün plaka sayısının a
 araştırılmalı.
 
 ## Geliştirme Planı:
-1. 
+1. WebUI için demo hazırla
+2. WebUI ile droneun iletişim kurması, kontrolü, boş gazebo dünyasında gezinmesi
+3. Gazebo dünyasına arabalar eklenmesi ve araba tespiti, WebUI üzerinde işaretleme
+4. Gazebo için plakalar ve plaka okuma algoritması
+5. Gazebo dünyasının doldurulması
+6. Basit objeden kaçınma (Veya PX4/Ardupilot ile uygula)
