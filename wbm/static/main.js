@@ -17,8 +17,9 @@ var circle = L.circle(serviceAreaCenter, {
 
 
 
-let area = null;
-let drawStatus = 0;  // 0 = not drawing / drawn, 1 = drawing
+let area = null;               // Final completed polygon
+let tempPreview = null;        // Temporary polygon while drawing
+let drawStatus = 0;            // 0 = not drawing, 1 = drawing
 let currentPoints = [];
 
 const button = document.getElementById("draw-area-button");
@@ -29,29 +30,40 @@ button.addEventListener("click", () => {
         currentPoints = [];
         if (area) {
             map.removeLayer(area);
+            area = null;
+        }
+        if (tempPreview) {
+            map.removeLayer(tempPreview);
+            tempPreview = null;
         }
         drawStatus = 1;
         button.textContent = "Complete";
     } else {
-        // Finish drawing
+        // Complete drawing
         if (currentPoints.length >= 3) {
-            area = L.polygon(currentPoints).addTo(map);
+            if (tempPreview) {
+                map.removeLayer(tempPreview);
+                tempPreview = null;
+            }
+            area = L.polygon(currentPoints, { color: 'blue' }).addTo(map);
         }
         drawStatus = 0;
         button.textContent = "Draw Area";
     }
 });
 
-// Click map to add point when drawing
 map.on("click", function (e) {
     if (drawStatus === 1) {
-        const latlng = [e.latlng.lat, e.latlng.lng];
-        currentPoints.push(latlng);
+        currentPoints.push([e.latlng.lat, e.latlng.lng]);
 
-        // Draw a temp preview (polyline)
-        if (area) {
-            map.removeLayer(area);
+        // Remove old preview before adding new one
+        if (tempPreview) {
+            map.removeLayer(tempPreview);
         }
-        area = L.polygon(currentPoints, { color: 'blue', dashArray: '5,5' }).addTo(map);
+        tempPreview = L.polygon(currentPoints, {
+            color: 'blue',
+            dashArray: '5, 5',
+            fillOpacity: 0.1
+        }).addTo(map);
     }
 });
