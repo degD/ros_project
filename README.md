@@ -1,1 +1,48 @@
 # ros_project
+
+## Senaryo:
+Kullanıcı harita üzerinden bir alan seçecek. Drone bu alan içinde arabaları tespit edip plakalarını okuyacak.
+Hangi plakaların bulunduğunu belirleyecek. Kullanıcının seçtiği alan "arama alanı" olsun, ama her yeri seçemez
+sonuçta. Droneun hizmet verdiği alan "hizmet alanı" diye adlandırılsın. Basit objeden kaçınma da var. 
+
+Basit bir WebUI olsun. Drone konumu gösterilsin ve hizmet alanı gösterilsin. Bir OSM widgeti olabilir. "Arama alanı"
+içinde hareket aralıklar ile waypoint konulması ile sağlanabilir. Bir "alan belirle" tuşu ve bir "onayla" tuşu olsun.
+Onaylayınca waypointler de harita üzerinde gösterilsin. Drone kontrolü için de iki tuş olabilir. Bir "başlat" ve bir
+"duraklat" tuşu. Hangi periyotlarla "arama alanında" gezileceğini girebileceğimiz bir "input" olsun. Kalkış noktasında
+olsun drone. "Başlat" ile alanda gezinsin ve geri kalkış noktasına dönsün. Periyot bitimine kadar beklesin ve yeni
+periyot ile tekrar hareket etsin. Her periyotta plakalar ve araç konumları listelensin. Plakaların raporlanması, 
+başlangıç için bir .txt dosyası aracılığı ile olabilir. Her periyot için bir dosya oluşturulur. "Hizmet alanı" şimdilik
+bir config dosyası ile belirlenen koordinat ve yarıçap ile gösterilsin. 
+
+WebUI basit bir şekilde Flask ile gerçekleştirilebilir. Server, duruma göre ROS ile iletişime geçer. Bir de her şeyi 
+çalıştıracak bir .launch dosyası lazım. ROS için Ardupilot veya PX4 ile Mavros kullanımı büyük kolaylık sağlar. SITL
+kurulum yapılmalı. Droneun gazebodan görüntüyü alması ve objeden kaçınmayı gazeboda yapması önemli. Ardupilot ile 
+normalde harita verisine göre bina yüksekliklerine dikkat ediliyordu. Bunu nasıl dahil edebilirim bakmalıyım. Özellikle
+üç temel nokta kalıyor: 
+1. Gezinme sırasında tüm alanın görüntüsünü aldığımdan emin olacağım bir algoritma
+2. Gazebo haritası, araba modelleri, plakalar, tabii kampüs gibi bir alanın gazeboda yüklenmesi için yöntem
+3. Görüntüleri almak, işlemek için YOLO modeli
+
+Bunların yanı sıra tespit edilen bir otomobil için plakanın nasıl okunacağı da ayrı bir sorun. Plakası ön veya arkada olabilir.
+Arabanın yaklaşık tepesinde konumlanırsa drone, araba çevresinde plaka görünceye kadar küçük bir tur atabilir. Eğer tur sonunda 
+plaka bulunmazsa arabayı "olası hatalı tespit" olarak işaretler ve gezme işine kaldığı yerden devam eder. Aynı plakayı yeniden
+görürse onu yine de listeye ekler. Sonuçta amaç hangi plakaların olduğunu listelemek. Görüntü işlemek ve plaka konusunda model
+bulunması veya eğitilmesi gerekebilir. Tüm bu işlem sırasında tercihen drone engellerden hala kaçınmalı.
+
+Hareketli araçlar için daha farklı bir yöntem uygulamalıyım. Araç hareket ettiği için aslında droneun onun 
+çevresinde tur atmasına gerek yok. Çünkü araç uzaklaştıkça plakası görünebilir bir açıya gelecek. Yine de hareketli
+araçların plakasının okunması bu proje kapsamında tam bulunmuyor. Amaç daha çok park halinde olan arabaların plakalarını okumak.
+Burada iki seçenek mevcut:
+1. Aracın hareket edip etmediğini algılayıp ona göre aksiyon al
+2. Ya da her durumda araba sabitmiş gibi davran
+Eğer aracın hareket edip etmediği tespit edilmek isteniyorsa droneun da hareketli olduğu göz önünde bulundurulmalı. Bu konuda en temel
+yöntem droneu sabitleyip aracın hareketli olup olmadığını anlamak olur. Ama bunu şimdilik proje kapsamından çıkarmak ve
+araçların hepsini sabit kabul etmek daha makul olacak gibi.
+
+Önce "arama alanı" droneun yüksekliğine göre eş karelere ayrılır ve drone bu karelerin merkezlerini ziyaret eder. Mesela yerden 20m
+yüksekte olur. Kamera aşağı dönük. Bir araba tespit edince araca doğru alçalır. Bu sırada plakasını gördüyse kalkar, devam eder. Peki ya çokça araba
+yan yanaysa? Bir park yeri gibi. Araç sayısı ile özgün plaka sayısının aynı olması lazımdır. Drone ile plaka tespit için nasıl bir yöntem uygulanacağı
+araştırılmalı.
+
+## Geliştirme Planı:
+1. 
