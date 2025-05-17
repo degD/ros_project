@@ -11,6 +11,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+    <script src="https://unpkg.com/proj4leaflet"></script>
+    <script src="https://unpkg.com/leaflet-pip/leaflet-pip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 </head>
 <body data-token="{{ config_data }}">
     <div id="map"></div>
@@ -26,7 +30,7 @@
         <button>Set</button>
     </section>
     <section>
-        <button id="draw-area-button">Draw Navigation Area</button>
+        <button id="draw-area-button">Draw Area</button>
     </section>
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
