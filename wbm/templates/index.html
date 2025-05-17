@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UAV Control WBM</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+</head>
+<body data-token="{{ config_data }}">
+    <div id="map"></div>
+    <section>
+        <label for="period-time">Period(min) <span id="period-current"></span>:</label>
+        <input type="number" name="period-time" id="period-time" placeholder="Period (in minutes)">
+        <button>Start</button>
+        <button>Stop</button>
+    </section>
+    <section>
+        <label for="height-control">UAV height <span id="height-current"></span>:</label>
+        <input type="number" name="height-input" id="height-input" placeholder="Height (in meters)">
+        <button>Set</button>
+    </section>
+    <section>
+        <button id="draw-area-button">Draw Navigation Area</button>
+    </section>
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
