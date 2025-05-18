@@ -12,6 +12,10 @@ let height = configData["init_height"];
 let period = configData["init_period"];
 
 
+const HEIGHT_MIN = 10;
+const HEIGHT_MAX = 100;
+
+
 function projectedAreaFromHeight(height, hfov, vfov) {
     let areaWidth = 2 * height * Math.tan(hfov * Math.PI / 360);
     let areaHeight = 2 * height * Math.tan(vfov * Math.PI / 360);
@@ -165,3 +169,18 @@ function tilePolygonArea(polygonGroup, tileWidth, tileHeight) {
 }
 
 
+document.addEventListener("DOMContentLoaded", () => {
+    
+    document.getElementById("height-input").value = height;
+    document.getElementById("height-current").textContent = height;
+});
+
+
+document.getElementById("set-height-button").addEventListener("click", () => {
+
+    const newHeight = document.getElementById("height-input").value;
+    if (HEIGHT_MIN <= newHeight && newHeight <= HEIGHT_MAX) {
+        document.getElementById("height-current").textContent = newHeight;
+        height = newHeight;
+    }
+});

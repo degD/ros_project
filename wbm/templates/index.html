@@ -22,12 +22,12 @@
         <label for="period-time">Period(min) <span id="period-current"></span>:</label>
         <input type="number" name="period-time" id="period-time" placeholder="Period (in minutes)">
         <button>Start</button>
-        <button>Stop</button>
+        <button type="submit">Stop</button>
     </section>
     <section>
         <label for="height-control">UAV height <span id="height-current"></span>:</label>
-        <input type="number" name="height-input" id="height-input" placeholder="Height (in meters)">
-        <button>Set</button>
+        <input min="1" max="100" type="number" name="height-input" id="height-input" placeholder="Height (in meters)">
+        <button id="set-height-button">Set</button>
     </section>
     <section>
         <button id="draw-area-button">Draw Area</button>
