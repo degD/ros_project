@@ -13,17 +13,10 @@ def home():
     except FileNotFoundError:
         pass
 
-@app.route("/submit_area", methods=["POST"])
-def submit_area():
-    coords = request.json.get("coordinates", [])
-    print("Received polygon:", coords)
-    return jsonify({"status": "ok", "waypoints": coords})
-
-@app.route("/control", methods=["POST"])
-def control():
-    action = request.json.get("action")
-    print(f"Received action: {action}")
-    return jsonify({"status": "ok"})
+@app.route("/navigation", methods=["POST"])
+def navigation():
+    print("Got data!")
+    return "Received data...", 200
 
 if __name__ == "__main__":
     app.run(debug=True)

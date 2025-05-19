@@ -19,10 +19,9 @@
 <body data-token="{{ config_data }}">
     <div id="map"></div>
     <section>
-        <label for="period-time">Period(min) <span id="period-current"></span>:</label>
-        <input type="number" name="period-time" id="period-time" placeholder="Period (in minutes)">
-        <button>Start</button>
-        <button type="submit">Stop</button>
+        <label for="period-time">Period(min) <span id="period-current"></span>/<span id="period-total"></span></label>
+        <button id="start-button">Start</button>
+        <button id="stop-button">Stop</button>
     </section>
     <section>
         <label for="height-control">UAV height <span id="height-current"></span>:</label>

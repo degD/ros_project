@@ -8,8 +8,9 @@ const configData = JSON.parse(document.body.dataset.token);
 const serviceAreaCenter = configData["service_area_center"];
 const serviceAreaRadius = configData["service_area_radius"];
 const cameraFov = configData["camera_fov"];
+const homePoint = configData["home_point"];
 let height = configData["init_height"];
-let period = configData["init_period"];
+let period = configData["period"];
 
 
 const HEIGHT_MIN = 10;
@@ -173,14 +174,80 @@ document.addEventListener("DOMContentLoaded", () => {
     
     document.getElementById("height-input").value = height;
     document.getElementById("height-current").textContent = height;
+
+    document.getElementById("period-total").textContent = period;
+    document.getElementById("period-current").textContent = Math.floor(periodCounter / (3600 * 1000));
 });
 
 
 document.getElementById("set-height-button").addEventListener("click", () => {
-
+    
     const newHeight = document.getElementById("height-input").value;
     if (HEIGHT_MIN <= newHeight && newHeight <= HEIGHT_MAX) {
         document.getElementById("height-current").textContent = newHeight;
         height = newHeight;
     }
 });
+
+
+let interval = null;
+let counterInterval = null;
+let periodCounter = 0
+const startBtn = document.getElementById("start-button");
+const stopBtn = document.getElementById("stop-button");
+startBtn.addEventListener("click", () => {
+
+    console.log("Start sending data...");
+
+    interval = setInterval(() => {
+        const centers = [];
+        tileLayerGroup.eachLayer(layer => {
+            let center;
+            center = layer.getBounds().getCenter();
+            centers.push(center);
+        });
+        centers.push({ "lat": homePoint[0], "lng": homePoint[1] });
+
+        const navData = {
+            "height": height,
+            "tiles": centers,
+        };
+
+        // Send navData to '/navigation' endpoint
+        fetch('/navigation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(navData)
+        }).then(response => {
+            if (!response.ok) {
+                console.error('Failed to send navigation data');
+            }
+        }).catch(error => {
+            console.error('Error sending navigation data:', error);
+        });
+        
+        console.log("Sent period navigation.");
+    }, 
+    period * 3600 * 1000);
+
+    counterInterval = setInterval(() => {
+        document.getElementById("period-current").textContent = Math.floor(periodCounter / period);
+        periodCounter++;
+    }, 1000);
+
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+});
+
+
+stopBtn.addEventListener("click", () => {
+
+    clearInterval(interval);
+    clearInterval(counterInterval);
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+});
+
+
