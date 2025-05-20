@@ -29,5 +29,6 @@ def navigation():
 
 
 if __name__ == "__main__":
-    rospy.init_node("navigation_node", anonymous=True)
-    app.run(debug=True)
+    if not rospy.core.is_initialized():
+        rospy.init_node("navigation_node", anonymous=True)
+    app.run(debug=True, use_reloader=False)

@@ -12,37 +12,40 @@ def simpleMove(point: Point):
     Args:
         point (Point): The target point to move to.
     """
-    # Create a publisher for the topic
     pub = rospy.Publisher('/firefly/command/pose', PoseStamped, queue_size=10)
-
-    # Create a PoseStamped message
     pose_stamped = PoseStamped()
     pose_stamped.header.stamp = rospy.Time.now()
-    pose_stamped.header.frame_id = "map"  # Adjust the frame_id as needed
+    pose_stamped.header.frame_id = "map"
     pose_stamped.pose.position = point
-    pose_stamped.pose.orientation.w = 1.0  # Neutral orientation
+    pose_stamped.pose.orientation.w = 1.0
 
-    # Publish the message
-    rospy.loginfo(f"Publishing target pose: {point}")
+    rospy.loginfo(f"Publishing target pose:\n{point}")
 
-    # Wait for the robot to arrive
-    rate = rospy.Rate(10)  # 10 Hz
+    latest_pose = {"pose": None}
+    def pose_callback(msg):
+        latest_pose["pose"] = msg
+
+    sub = rospy.Subscriber('/firefly/ground_truth/pose', Pose, pose_callback)
+    rate = rospy.Rate(10)
     arrived = False
 
     rospy.loginfo("Waiting for the robot to arrive...")
     while not rospy.is_shutdown() and not arrived:
+        print("aaa")
         pub.publish(pose_stamped)
+        pose = latest_pose["pose"]
+        if pose is not None:
+            rospy.loginfo(pose)
+            if (
+                abs(pose.position.x - point.x) < EPS and
+                abs(pose.position.y - point.y) < EPS and
+                abs(pose.position.z - point.z) < EPS
+            ):
+                arrived = True
         rate.sleep()
 
-        pose: Pose = rospy.wait_for_message('/firefly/ground_truth/pose', Pose)
-        if (
-            abs(pose.position.x - point.x) < EPS and 
-            abs(pose.position.y - point.y) < EPS and 
-            abs(pose.position.z - point.z) < EPS
-        ):
-            arrived = True
-
     rospy.loginfo("Robot has arrived at the target point.")
+    sub.unregister()
 
 
 def convertNavDataToWaypoints(navData):

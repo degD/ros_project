@@ -209,7 +209,7 @@ startBtn.addEventListener("click", () => {
     centers.push(latlngToMeters({ "lat": homePoint[0], "lng": homePoint[1] }));
     const navData = {
         "home": latlngToMeters(homePoint),
-        "height": height,
+        "height": Number(height),
         "tiles": centers,
     };
     fetch('/navigation', {
@@ -234,6 +234,11 @@ startBtn.addEventListener("click", () => {
             centers.push(latlngToMeters(center));
         });
         centers.push(latlngToMeters({ "lat": homePoint[0], "lng": homePoint[1] }));
+        const navData = {
+            "home": latlngToMeters(homePoint),
+            "height": Number(height),
+            "tiles": centers,
+        };
 
         // Send navData to '/navigation' endpoint
         fetch('/navigation', {
