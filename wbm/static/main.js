@@ -199,19 +199,41 @@ startBtn.addEventListener("click", () => {
 
     console.log("Start sending data...");
 
+    // Initially send navData to '/navigation' endpoint
+    const centers = [];
+    tileLayerGroup.eachLayer(layer => {
+        let center;
+        center = layer.getBounds().getCenter();
+        centers.push(latlngToMeters(center));
+    });
+    centers.push(latlngToMeters({ "lat": homePoint[0], "lng": homePoint[1] }));
+    const navData = {
+        "home": latlngToMeters(homePoint),
+        "height": height,
+        "tiles": centers,
+    };
+    fetch('/navigation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(navData)
+    }).then(response => {
+        if (!response.ok) {
+            console.error('Failed to send navigation data');
+        }
+    }).catch(error => {
+        console.error('Error sending navigation data:', error);
+    });
+
     interval = setInterval(() => {
         const centers = [];
         tileLayerGroup.eachLayer(layer => {
             let center;
             center = layer.getBounds().getCenter();
-            centers.push(center);
+            centers.push(latlngToMeters(center));
         });
-        centers.push({ "lat": homePoint[0], "lng": homePoint[1] });
-
-        const navData = {
-            "height": height,
-            "tiles": centers,
-        };
+        centers.push(latlngToMeters({ "lat": homePoint[0], "lng": homePoint[1] }));
 
         // Send navData to '/navigation' endpoint
         fetch('/navigation', {
