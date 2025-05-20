@@ -159,5 +159,5 @@ def simpleNavigation(waypoints: list):
 if __name__ == "__main__":
 
     rospy.init_node("navigation_node", anonymous=True)
-    simpleNavigation([Point(100, 100, 10)])
+    simpleNavigation([Point(30, -10, 20)])
     rospy.spin()
