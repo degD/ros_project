@@ -45,6 +45,8 @@ yüksekte olur. Kamera aşağı dönük. Bir araba tespit edince araca doğru al
 yan yanaysa? Bir park yeri gibi. Araç sayısı ile özgün plaka sayısının aynı olması lazımdır. Drone ile plaka tespit için nasıl bir yöntem uygulanacağı
 araştırılmalı.
 
+(arabalar: https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5)
+
 ## Geliştirme Planı:
 1. WebUI için demo hazırla
 2. WebUI ile droneun iletişim kurması, kontrolü, boş gazebo dünyasında gezinmesi

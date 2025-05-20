@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="my_stl_model">
+    <static>true</static>
+    <link name="link">
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://car3/meshes/car3.dae</uri></mesh>
+        </geometry>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://car3/meshes/car3.dae</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
