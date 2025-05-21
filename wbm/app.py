@@ -1,6 +1,7 @@
-
 from flask import Flask, render_template, request, jsonify
 import json
+import rospy
+import wbm.ros_library as ros_library
 
 app = Flask(__name__)
 
@@ -16,7 +17,18 @@ def home():
 @app.route("/navigation", methods=["POST"])
 def navigation():
     print("Got data!")
+    
+    # Print the received data
+    data = request.get_json()
+    print("Received data:", data)
+
+    waypoints = ros_library.convertNavDataToWaypoints(data)
+    ros_library.simpleNavigation(waypoints)
+    
     return "Received data...", 200
 
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    if not rospy.core.is_initialized():
+        rospy.init_node("navigation_node", anonymous=True)
+    app.run(debug=True, use_reloader=False)
