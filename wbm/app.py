@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import json
 import rospy
-import ros_navigation
+import wbm.ros_library as ros_library
 
 app = Flask(__name__)
 
@@ -22,8 +22,8 @@ def navigation():
     data = request.get_json()
     print("Received data:", data)
 
-    waypoints = ros_navigation.convertNavDataToWaypoints(data)
-    ros_navigation.simpleNavigation(waypoints)
+    waypoints = ros_library.convertNavDataToWaypoints(data)
+    ros_library.simpleNavigation(waypoints)
     
     return "Received data...", 200
 

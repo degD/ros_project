@@ -1,6 +1,10 @@
 import rospy
 from geometry_msgs.msg import Point, PointStamped, Pose, PoseStamped
 import math
+import os
+import cv2
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 
 
 EPS = 0.5
@@ -66,7 +70,7 @@ def stepMove(target_point: Point):
             start.y + dy * ratio,
             start.z + dz * ratio
         )
-        rospy.loginfo(f"Step {i}/{steps}: Moving to {intermediate}")
+        rospy.loginfo(f"Step {i}/{steps}: Moving to\n{intermediate}")
         simpleMove(intermediate)
         start = intermediate
 
@@ -135,7 +139,7 @@ def convertNavDataToWaypoints(navData):
     return waypoints
 
 
-def simpleNavigation(waypoints: list):
+def simpleNavigation(waypoints: list, image=False):
     """
     Navigates through a list of waypoints one by one.
 
@@ -154,10 +158,71 @@ def simpleNavigation(waypoints: list):
     for i, wp in enumerate(waypoints):
         rospy.loginfo(f"Moving to waypoint #{i}/{wpNum}...")
         stepMove(wp)
+        if image:
+            rospy.sleep(1)
+            takePhoto()
 
+
+# Subscribe to the topic '/firefly/image_raw' and save the RGB image into 'images' dir.
+# With the drone position (x,y,z) as file name.
+def takePhoto():
+    bridge = CvBridge()
+    latest_image = {"image": None}
+    latest_pose = get_current_pose()
+
+    if latest_pose is None:
+        rospy.logerr("Current pose unavailable. Cannot take photo.")
+        return
+
+    def image_callback(msg):
+        latest_image["image"] = bridge.imgmsg_to_cv2(msg, "bgr8")
+
+    sub = rospy.Subscriber('/firefly/image_raw', Image, image_callback)
+    rate = rospy.Rate(10)
+    timeout = rospy.Time.now() + rospy.Duration(2.0)  # 2 seconds timeout
+
+    while not rospy.is_shutdown() and latest_image["image"] is None and rospy.Time.now() < timeout:
+        rate.sleep()
+    sub.unregister()
+
+    if latest_image["image"] is None:
+        rospy.logwarn("Could not capture image.")
+        return
+
+    # Save the image with the drone's position as the filename
+    position = latest_pose.position
+    filename = f"images/{position.x:.2f}_{position.y:.2f}_{position.z:.2f}.png"
+    os.makedirs("images", exist_ok=True)
+    cv2.imwrite(filename, latest_image["image"])
+    rospy.loginfo(f"Photo saved as {filename}")
+
+# Remove all the images in the 'images' folder
+def resetPhotos():
+    folder = "images"
+    if not os.path.exists(folder):
+        rospy.loginfo(f"No images to delete. Folder '{folder}' does not exist.")
+        return
+
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+                rospy.loginfo(f"Deleted {file_path}")
+        except Exception as e:
+            rospy.logerr(f"Failed to delete {file_path}: {e}")
+    rospy.loginfo("All images have been deleted.")
 
 if __name__ == "__main__":
 
     rospy.init_node("navigation_node", anonymous=True)
-    simpleNavigation([Point(30, -10, 20)])
-    rospy.spin()
+    resetPhotos()
+    simpleNavigation([
+        Point(0, 0, 100),
+        Point(10, 0, 50),
+        Point(20, 0, 50),
+        Point(-10, 0, 40),
+        Point(0, 10, 60),
+        Point(0, 15, 20),
+        Point(10, 10, 20)
+    ], image=True)
