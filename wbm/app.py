@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import json
 import rospy
-import wbm.ros_library as ros_library
+import ros_library as ros_library
 
 app = Flask(__name__)
 
@@ -12,7 +12,8 @@ def home():
             data = json.load(fp)
         return render_template("index.html", config_data=json.dumps(data))
     except FileNotFoundError:
-        pass
+        return "Configuration file not found.", 404
+
 
 @app.route("/navigation", methods=["POST"])
 def navigation():
@@ -29,6 +30,5 @@ def navigation():
 
 
 if __name__ == "__main__":
-    if not rospy.core.is_initialized():
-        rospy.init_node("navigation_node", anonymous=True)
-    app.run(debug=True, use_reloader=False)
+    # rospy.init_node("navigation_node")
+    app.run(debug=True)

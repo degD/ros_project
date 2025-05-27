@@ -218,11 +218,19 @@ if __name__ == "__main__":
     rospy.init_node("navigation_node", anonymous=True)
     resetPhotos()
     simpleNavigation([
-        Point(0, 0, 100),
-        Point(10, 0, 50),
-        Point(20, 0, 50),
-        Point(-10, 0, 40),
+        Point(20, 0, 60),
+        Point(10, 0, 60),
+        Point(0, 0, 60),
+        Point(-10, 0, 60),
+        Point(-20, 0, 60),
+
+        Point(0, 20, 60),
         Point(0, 10, 60),
-        Point(0, 15, 20),
-        Point(10, 10, 20)
+        Point(0, -10, 60),
+        Point(0, -20, 60),
+
+        Point(10, 10, 60),
+        Point(20, 20, 60),
+        Point(-10, -10, 60),
+        Point(-20, -20, 60),
     ], image=True)
