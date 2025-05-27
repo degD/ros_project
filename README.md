@@ -55,21 +55,19 @@ araştırılmalı.
 5. Gazebo dünyasının doldurulması
 6. Basit objeden kaçınma (Veya PX4/Ardupilot ile uygula)
 
-## İlerleme:
-- Drone için WBM demosu hazır
-- Drone verileri alıp hareket ediyordu
-- Plakalı araçlar blender ile üretiliyor
-- Harita hazır gibi
-
-## Kalan işler:
-- Harita gazeboya yüklenemedi
-- Araç tespit
-- Plakayı görmek için hareket
-- Plaka OCR
-
 ## Harita
 Özellikle haritanın oluşturulması ve gazeboya yüklenmesi sırasında sıkıntı ile karşılaşıldı. Gazebo dünyasında model yüklenemiyor.
 İki seçenek var:
 1. Modeli yüklemeye çalışmaya devam et.
 2. Gazebo içinden bir mini dünya oluştur.
 
+## İlerleme:
+- Drone için WBM demosu hazır
+- Drone verileri alıp hareket ediyordu
+- Plakalı araçlar blender ile üretiliyor
+- Basit gazebo haritası hazır
+
+## Kalan işler:
+- Araç tespit
+- Plakayı görmek için hareket
+- Plaka OCR
