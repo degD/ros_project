@@ -19,3 +19,12 @@ python test.py 2> /dev/null
 ```
 
 Eğer kurulum sorunsuz gerçekleştiyse ekranda koordinatlar içeren diziler göreceksiniz. Eğer bir hatayla karşılaşırsanız, hiçbir çıktı görmezseniz, adımlarınızı tekrar gözden geçirin. Yine bir çözüme ulaşamıyorsanız bir **issue oluşturarak** yardım isteyebilirsiniz.
+
+## Çalışma Sistemi
+1. Drone navigasyonu tamamlamış ve fotoğrafları çekmiş. Fotoğraflar `PHOTOS_DIR` klasöründe.
+2. Her fotoğraf adı, orta noktanın koordinatlarını veriyor. Araç tespiti de resme göre araç konumlarını.
+3. Bu iki veri kullanılarak araçların haritaya göre koordinatları hesaplanabilir. Buna küresel koordinat diyeceğim.
+4. Burada elbette yanlış ve eksik işaretlemeler olacak. Küresel koordinatlar ile doğruluk oranları da tutulabilir.
+5. Koordinatlar kaç kez araç olarak tespit edilmiş, hangi doğruluk oranları ile, bakılarak bazıları gözden çıkarılabilir.
+6. Kalanlarda da drone yaklaştığında sonuç değişirse araç olmadığı anlaşılır (Bu modülün dışında).
+7. Araç olduğu anlaşılanlar için Plaka okuma kısmına geçilir.
