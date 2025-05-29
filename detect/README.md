@@ -28,3 +28,6 @@ Eğer kurulum sorunsuz gerçekleştiyse ekranda koordinatlar içeren diziler gö
 5. Koordinatlar kaç kez araç olarak tespit edilmiş, hangi doğruluk oranları ile, bakılarak bazıları gözden çıkarılabilir.
 6. Kalanlarda da drone yaklaştığında sonuç değişirse araç olmadığı anlaşılır (Bu modülün dışında).
 7. Araç olduğu anlaşılanlar için Plaka okuma kısmına geçilir.
+
+## İlerleme
+- 4 numaralı adıma kadar tamamlandı. 4 kısmen tamamlandı. Koordinatlar dönüştürülüyor ancak doğrulama tam değil.

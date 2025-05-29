@@ -1,0 +1,192 @@
+from typing import Tuple
+from mmdet.apis import init_detector, inference_detector
+import mmrotate
+import warnings
+from pathlib import Path
+from PIL import Image, ImageDraw
+from math import tan, radians
+import numpy as np
+
+warnings.filterwarnings("ignore")
+
+
+IMAGE_DIR = '../images/'
+DEVICE = 'cuda:0'
+CONFIG_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90.py'
+CHECKPOINT_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90-6d2b2ce0.pth'
+MODEL = init_detector(CONFIG_FILE, CHECKPOINT_FILE, device=DEVICE)
+FOV = [90, 90]  # Later on get it from the config.json
+
+
+def fov_to_ground_size(
+    fov_horizontal_deg: float,
+    fov_vertical_deg: float,
+    altitude_m: float
+) -> Tuple[float, float]:
+    """
+    Convert camera FOV and altitude to ground footprint size in meters.
+    """
+    fov_h_rad = radians(fov_horizontal_deg)
+    fov_v_rad = radians(fov_vertical_deg)
+
+    width_m = 2 * altitude_m * tan(fov_h_rad / 2)
+    height_m = 2 * altitude_m * tan(fov_v_rad / 2)
+
+    return width_m, height_m
+
+
+def get_image_size(path) -> Tuple[int, int]:
+    path = Path(path).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"Image not found: {path}")
+
+    with Image.open(path) as im:
+        width_px, height_px = im.size  # (width, height)
+
+    return width_px, height_px
+
+
+def pixel_to_global(
+    center: Tuple[float, float],
+    vehicle_coord: Tuple[float, float],
+    image_size_pixels: Tuple[int, int],
+    image_size_meters: Tuple[float, float]
+) -> Tuple[float, float]:
+    """
+    Convert a vehicle's pixel coordinates in an image to global (world) metres.
+
+    Parameters
+    ----------
+    center : (float, float)
+        Global X, Y of the image centre in metres.
+    vehicle_coord : (float, float)
+        Pixel (x, y) of the vehicle in image coordinates (origin = top-left).
+    image_size_pixels : (int, int)
+        (width_px, height_px) of the image.
+    image_size_meters : (float, float)
+        (width_m, height_m) footprint of the image on the ground.
+
+    Returns
+    -------
+    (float, float)
+        Global X, Y of the vehicle in metres.
+    """
+    x0, y0 = center
+    xk_px, yk_px = vehicle_coord
+    width_px, height_px = image_size_pixels
+    width_m, height_m = image_size_meters
+
+    # metres per pixel along each axis
+    m_per_px_x = width_m / width_px
+    m_per_px_y = height_m / height_px
+
+    # offset of the vehicle from the image centre in pixels
+    dx_px = xk_px - width_px / 2
+    dy_px = yk_px - height_px / 2
+
+    # convert offset to metres
+    dx_m = dx_px * m_per_px_x
+    dy_m = dy_px * m_per_px_y
+
+    # global coordinate
+    X_global = x0 + dx_m
+    Y_global = y0 + dy_m
+
+    return X_global, -1*Y_global
+
+
+def simple_inference(image_filename: str):
+    return inference_detector(MODEL, IMAGE_DIR+image_filename)
+
+
+def inference_with_absolute_coordinates(image_filename: str):
+    result = simple_inference(image_filename)
+
+    # Extract global center and altitude from filename
+    image_coords = image_filename.strip(".png").split("_")
+    x0 = float(image_coords[0])
+    y0 = float(image_coords[1])
+    altitude = float(image_coords[2])
+
+    # Get image size in pixels
+    img_size_px = get_image_size(IMAGE_DIR + image_filename)
+
+    # Compute image size in meters from FOV and altitude
+    img_size_m = fov_to_ground_size(FOV[0], FOV[1], altitude)
+
+    abs_list = []
+
+    for class_detections in result:
+        for x, y, w, h, angle, score in class_detections:
+            x_g, y_g = pixel_to_global(
+                (x0, y0),
+                (x, y),
+                img_size_px,
+                img_size_m
+            )
+            if score > 0.4:
+                abs_list.append({
+                    "x_global": x_g,
+                    "y_global": y_g,
+                    "altitude": altitude,
+                    "score": score
+                })
+
+    return abs_list
+
+
+def draw_rotated_box(draw, cx, cy, w, h, angle_rad, outline="red", width=2):
+    """Draw a rotated rectangle on a PIL canvas."""
+    cos_a = np.cos(angle_rad)
+    sin_a = np.sin(angle_rad)
+
+    dx = w / 2
+    dy = h / 2
+    corners = np.array([
+        [-dx, -dy],
+        [ dx, -dy],
+        [ dx,  dy],
+        [-dx,  dy]
+    ])
+
+    rot = np.array([[cos_a, -sin_a], [sin_a, cos_a]])
+    rotated_corners = np.dot(corners, rot.T) + np.array([cx, cy])
+    polygon = [tuple(p) for p in rotated_corners]
+    draw.polygon(polygon, outline=outline, width=width)
+
+
+def draw_image_center(draw, width: int, height: int, color="blue", radius=5):
+    """Draw a dot at the center of the image."""
+    cx, cy = width // 2, height // 2
+    draw.ellipse([(cx - radius, cy - radius), (cx + radius, cy + radius)],
+                 fill=color, outline=color)
+
+
+def draw_detections_on_image(image_filename: str, output_path: str = None, score_threshold: float = 0.4):
+    """Draw rotated boxes for detections and mark image center."""
+    image_path = Path(IMAGE_DIR) / image_filename
+    result = simple_inference(image_filename)
+
+    img = Image.open(image_path).convert("RGB")
+    draw = ImageDraw.Draw(img)
+
+    # Mark image center
+    w, h = img.size
+    draw_image_center(draw, w, h, color="blue", radius=5)
+
+    for class_detections in result:
+        for x, y, w_box, h_box, angle, score in class_detections:
+            if score >= score_threshold:
+                draw_rotated_box(draw, x, y, w_box, h_box, angle, outline="lime", width=3)
+
+    if output_path:
+        img.save(output_path)
+    else:
+        return img
+
+
+if __name__ == "__main__":
+    IMAGE_DIR = ""
+    r = inference_with_absolute_coordinates("0.00_0.00_50.00.png")
+    print(*r, sep="\n")
+    draw_detections_on_image("0.00_0.00_50.00.png", "demo_out.png")
