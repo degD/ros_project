@@ -10,7 +10,7 @@ import numpy as np
 warnings.filterwarnings("ignore")
 
 
-IMAGE_DIR = '../images/'
+IMAGE_DIR = 'images/'
 DEVICE = 'cuda:0'
 CONFIG_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90.py'
 CHECKPOINT_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90-6d2b2ce0.pth'
