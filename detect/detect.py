@@ -6,6 +6,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from math import tan, radians
 import numpy as np
+import json
 
 warnings.filterwarnings("ignore")
 
@@ -124,13 +125,12 @@ def inference_with_absolute_coordinates(image_filename: str):
                 img_size_px,
                 img_size_m
             )
-            if score > 0.4:
-                abs_list.append({
-                    "x_global": x_g,
-                    "y_global": y_g,
-                    "altitude": altitude,
-                    "score": score
-                })
+            abs_list.append({
+                "x_global": x_g,
+                "y_global": y_g,
+                "altitude": altitude,
+                "score": score
+            })
 
     return abs_list
 
