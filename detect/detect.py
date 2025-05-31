@@ -6,7 +6,6 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from math import tan, radians
 import numpy as np
-import json
 
 warnings.filterwarnings("ignore")
 
@@ -16,7 +15,7 @@ DEVICE = 'cuda:0'
 CONFIG_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90.py'
 CHECKPOINT_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90-6d2b2ce0.pth'
 MODEL = init_detector(CONFIG_FILE, CHECKPOINT_FILE, device=DEVICE)
-FOV = [90, 90]  # Later on get it from the config.json
+FOV = [60, 45]  # Later on get it from the config.json
 
 
 def fov_to_ground_size(
