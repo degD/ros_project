@@ -6,6 +6,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from math import tan, radians
 import numpy as np
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -185,7 +186,15 @@ def draw_detections_on_image(image_filename: str, output_path: str = None, score
 
 
 if __name__ == "__main__":
-    IMAGE_DIR = ""
-    r = inference_with_absolute_coordinates("0.00_0.00_50.00.png")
-    print(*r, sep="\n")
-    draw_detections_on_image("0.00_0.00_50.00.png", "demo_out.png")
+    IMAGE_DIR = "images/"
+    OUTPUT_DIR = "output/"
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    # List all image files in the IMAGE_DIR
+    image_files = [f for f in os.listdir(IMAGE_DIR) if f.endswith(".png")]
+
+    for image_file in image_files:
+        # Perform inference and draw detection boxes
+        output_path = os.path.join(OUTPUT_DIR, f"det_{image_file}")
+        draw_detections_on_image(image_file, output_path, score_threshold=0.5)
+        print(f"Processed {image_file} -> {output_path}")

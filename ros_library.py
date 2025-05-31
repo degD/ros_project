@@ -11,6 +11,7 @@ EPS = 0.5
 MAX_DIST = 10.0  # Maximum distance for each step (adjust as needed)
 INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
+VEHICLE_EPS = 2
 
 
 def get_current_pose():
@@ -224,42 +225,54 @@ def inferenceImages():
         return 
 
     coords = set()
+    def is_far_enough(new_coord):
+        for existing_coord in coords:
+            distance = math.sqrt(
+                (new_coord[0] - existing_coord[0]) ** 2 +
+                (new_coord[1] - existing_coord[1]) ** 2
+            )
+            if distance < VEHICLE_EPS:
+                return False
+        return True
+
     for filename in os.listdir(folder):
         for data in detect.inference_with_absolute_coordinates(filename):
-            
             if data["score"] > INFERENCE_THRESHOLD:
-                coords.add( (
+                new_coord = (
                     round(data["x_global"]), 
                     round(data["y_global"]), 
-                    INFERENCE_Z) 
+                    INFERENCE_Z
                 )
+                if is_far_enough(new_coord):
+                    coords.add(new_coord)
 
     for p in coords:
         print(f"({p[0]}, {p[1]}, {p[2]})")
+    print(f"LEN: {len(coords)}")
 
     return coords
 
 if __name__ == "__main__":
 
-    rospy.init_node("navigation_node", anonymous=True)
-    resetPhotos()
-    simpleNavigation([
-        Point(20, 0, 60),
-        Point(10, 0, 60),
-        Point(0, 0, 60),
-        Point(-10, 0, 60),
-        Point(-20, 0, 60),
+    # rospy.init_node("navigation_node", anonymous=True)
+    # resetPhotos()
+    # simpleNavigation([
+    #     Point(20, 0, 60),
+    #     Point(10, 0, 60),
+    #     Point(0, 0, 60),
+    #     Point(-10, 0, 60),
+    #     Point(-20, 0, 60),
 
-        Point(0, 20, 60),
-        Point(0, 10, 60),
-        Point(0, -10, 60),
-        Point(0, -20, 60),
+    #     Point(0, 20, 60),
+    #     Point(0, 10, 60),
+    #     Point(0, -10, 60),
+    #     Point(0, -20, 60),
 
-        Point(10, 10, 60),
-        Point(20, 20, 60),
-        Point(-10, -10, 60),
-        Point(-20, -20, 60),
-    ], image=True)
+    #     Point(10, 10, 60),
+    #     Point(20, 20, 60),
+    #     Point(-10, -10, 60),
+    #     Point(-20, -20, 60),
+    # ], image=True)
 
-    # inferenceImages()
+    inferenceImages()
 

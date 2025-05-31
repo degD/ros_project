@@ -31,3 +31,6 @@ Eğer kurulum sorunsuz gerçekleştiyse ekranda koordinatlar içeren diziler gö
 
 ## İlerleme
 - 4 numaralı adıma kadar tamamlandı. 4 kısmen tamamlandı. Koordinatlar dönüştürülüyor ancak doğrulama tam değil.
+
+## Hata Çözüm
+Eğer fotoğraf çekilirken hata veriyorsa: `export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtiff.so.5` komutunu çalıştırın. Sonra yeniden deneyin.
