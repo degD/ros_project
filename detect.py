@@ -72,28 +72,19 @@ def pixel_to_global(
     (float, float)
         Global X, Y of the vehicle in metres.
     """
-    x0, y0 = center
-    xk_px, yk_px = vehicle_coord
-    width_px, height_px = image_size_pixels
-    width_m, height_m = image_size_meters
+    x0, y0 = vehicle_coord
+    w, h = image_size_pixels
 
-    # metres per pixel along each axis
-    m_per_px_x = width_m / width_px
-    m_per_px_y = height_m / height_px
+    # Gazebo world coordinates
+    gx, gy = h/2-y0, w/2-x0
 
-    # offset of the vehicle from the image centre in pixels
-    dx_px = xk_px - width_px / 2
-    dy_px = yk_px - height_px / 2
+    # To meters
+    wm, hm = image_size_meters
+    xm, ym = gx*wm/w, gy*hm/h
 
-    # convert offset to metres
-    dx_m = dx_px * m_per_px_x
-    dy_m = dy_px * m_per_px_y
-
-    # global coordinate
-    X_global = x0 + dx_m
-    Y_global = y0 + dy_m
-
-    return X_global, -1*Y_global
+    # Shift by center
+    cx, cy = center
+    return cx+xm, cy+ym
 
 
 def simple_inference(image_filename: str):

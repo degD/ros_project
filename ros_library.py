@@ -9,9 +9,9 @@ from cv_bridge import CvBridge
 
 EPS = 0.5
 MAX_DIST = 10.0  # Maximum distance for each step (adjust as needed)
-INFERENCE_THRESHOLD = 0.4
+INFERENCE_THRESHOLD = 0.5
 INFERENCE_Z = 20
-VEHICLE_EPS = 2
+VEHICLE_EPS = 5
 
 
 def get_current_pose():
@@ -236,6 +236,7 @@ def inferenceImages():
         return True
 
     for filename in os.listdir(folder):
+        print(filename)
         for data in detect.inference_with_absolute_coordinates(filename):
             if data["score"] > INFERENCE_THRESHOLD:
                 new_coord = (
@@ -245,6 +246,8 @@ def inferenceImages():
                 )
                 if is_far_enough(new_coord):
                     coords.add(new_coord)
+
+                print(f'\t{data["x_global"]}, {data["y_global"]}')
 
     for p in coords:
         print(f"({p[0]}, {p[1]}, {p[2]})")
