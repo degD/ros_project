@@ -177,12 +177,13 @@ def draw_detections_on_image(image_filename: str, output_path: str = None, score
 
 
 if __name__ == "__main__":
-    IMAGE_DIR = "images/"
+    IMAGE_DIR = ""
     OUTPUT_DIR = "output/"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # List all image files in the IMAGE_DIR
-    image_files = [f for f in os.listdir(IMAGE_DIR) if f.endswith(".png")]
+    # image_files = [f for f in os.listdir(IMAGE_DIR) if f.endswith(".png")]
+    image_files = ["image.png"]
 
     for image_file in image_files:
         # Perform inference and draw detection boxes
