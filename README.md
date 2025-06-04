@@ -66,8 +66,8 @@ araştırılmalı.
 - Drone verileri alıp hareket ediyordu
 - Plakalı araçlar blender ile üretiliyor
 - Basit gazebo haritası hazır
+- Araç tespiti temelde anlaşıldı
 
 ## Kalan işler:
-- Araç tespit
 - Plakayı görmek için hareket
 - Plaka OCR
