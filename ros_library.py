@@ -1,4 +1,4 @@
-import detect
+# import detect
 import rospy
 from geometry_msgs.msg import Point, PointStamped, Pose, PoseStamped
 import math
@@ -6,6 +6,7 @@ import os
 import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 EPS = 0.5
 MAX_DIST = 10.0  # Maximum distance for each step (adjust as needed)
@@ -255,27 +256,132 @@ def inferenceImages():
 
     return coords
 
+
+def rotateDrone(degrees):
+    """
+    Rotates the drone in place by 'degrees' (relative to its current heading).
+    No persistence in future commands (once complete, orientation remains changed).
+    """
+    pub = rospy.Publisher('/firefly/command/pose', PoseStamped, queue_size=10)
+    current_pose = get_current_pose()
+    if current_pose is None:
+        rospy.logerr("Current pose unavailable. Cannot rotate.")
+        return
+
+    # Convert current orientation to Euler angles (roll, pitch, yaw)
+    q = (current_pose.orientation.x,
+         current_pose.orientation.y,
+         current_pose.orientation.z,
+         current_pose.orientation.w)
+    roll, pitch, yaw = euler_from_quaternion(q)
+
+    # Calculate new orientation
+    new_yaw = yaw + math.radians(degrees)
+    new_q = quaternion_from_euler(roll, pitch, new_yaw)
+
+    # Build a PoseStamped with same position but updated orientation
+    pose_stamped = PoseStamped()
+    pose_stamped.header.stamp = rospy.Time.now()
+    pose_stamped.header.frame_id = "map"
+    pose_stamped.pose.position = current_pose.position
+    pose_stamped.pose.orientation.x = new_q[0]
+    pose_stamped.pose.orientation.y = new_q[1]
+    pose_stamped.pose.orientation.z = new_q[2]
+    pose_stamped.pose.orientation.w = new_q[3]
+
+    # Publish until the drone is close to the desired yaw
+    rate = rospy.Rate(10)
+    arrived = False
+    rospy.loginfo(f"Rotating by {degrees} degrees...")
+
+    while not rospy.is_shutdown() and not arrived:
+        pub.publish(pose_stamped)
+        updated_pose = get_current_pose()
+        if updated_pose:
+            uq = (updated_pose.orientation.x,
+                  updated_pose.orientation.y,
+                  updated_pose.orientation.z,
+                  updated_pose.orientation.w)
+            _, _, current_yaw = euler_from_quaternion(uq)
+            if abs(current_yaw - new_yaw) < 0.05:  # Radians threshold
+                arrived = True
+        rate.sleep()
+
+    rospy.loginfo("Drone rotation complete.")
+
+
+def stepRotateDrone(degrees, step=90):
+    s = 0
+    while abs(s) < abs(degrees):
+        rotateDrone((degrees / abs(degrees)) * step)
+        s += step
+
+
+# Fly over the car (for example (10,-8))
+# Rotate around it, maybe with an altitude of 10m or less
+# Get photos of the front and back
+# Then read the plates
+def readCarPlate(carPosition):
+    """
+    Fly over the car, rotate around it, take photos, and read the plates.
+    Args:
+        carPosition (Point): The (x, y) position of the car.
+    Returns:
+        str: Placeholder for the detected plate text.
+    """
+    altitude = 3  # Fixed altitude for rotation
+    rotation_radius = 4  # Distance from the car for rotation
+    rotation_angles = [0, 90, 180, -90]  # Angles to capture front and back photos
+
+    rospy.loginfo(f"Starting rotation around car at {carPosition}.")
+    for angle in rotation_angles:
+        # Calculate the position based on rotation angle
+        rad = math.radians(angle)
+        target_point = Point(
+            carPosition.x - rotation_radius * math.cos(rad),
+            carPosition.y - rotation_radius * math.sin(rad),
+            altitude
+        )
+        stepMove(target_point)
+        stepRotateDrone(angle)
+        rospy.sleep(1)  # Allow time for stabilization
+        stepRotateDrone(-1*angle)
+        rospy.sleep(1)  # Allow time for stabilization
+        # takePhoto()
+
+    rospy.loginfo("Photos taken. Placeholder for plate detection.")
+    return "PLATE_PLACEHOLDER"
+
+
 if __name__ == "__main__":
 
-    rospy.init_node("navigation_node", anonymous=True)
-    resetPhotos()
-    simpleNavigation([
-        Point(20, 0, 60),
-        Point(10, 0, 60),
-        Point(0, 0, 60),
-        Point(-10, 0, 60),
-        Point(-20, 0, 60),
+    # rospy.init_node("navigation_node", anonymous=True)
+    # resetPhotos()
+    # simpleNavigation([
+    #     Point(20, 0, 60),
+    #     Point(10, 0, 60),
+    #     Point(0, 0, 60),
+    #     Point(-10, 0, 60),
+    #     Point(-20, 0, 60),
 
-        Point(0, 20, 60),
-        Point(0, 10, 60),
-        Point(0, -10, 60),
-        Point(0, -20, 60),
+    #     Point(0, 20, 60),
+    #     Point(0, 10, 60),
+    #     Point(0, -10, 60),
+    #     Point(0, -20, 60),
 
-        Point(10, 10, 60),
-        Point(20, 20, 60),
-        Point(-10, -10, 60),
-        Point(-20, -20, 60),
-    ], image=True)
+    #     Point(10, 10, 60),
+    #     Point(20, 20, 60),
+    #     Point(-10, -10, 60),
+    #     Point(-20, -20, 60),
+    # ], image=True)
 
     # inferenceImages()
+
+    rospy.init_node("navigation_node", anonymous=True)
+    # resetPhotos()
+    # simpleNavigation([
+    #     Point(7, -8, 2)
+    # ], image=True)
+    readCarPlate(Point(10, -8, 0))
+
 

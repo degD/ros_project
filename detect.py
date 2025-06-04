@@ -187,5 +187,5 @@ if __name__ == "__main__":
     for image_file in image_files:
         # Perform inference and draw detection boxes
         output_path = os.path.join(OUTPUT_DIR, f"det_{image_file}")
-        draw_detections_on_image(image_file, output_path, score_threshold=0.5)
+        draw_detections_on_image(image_file, output_path, score_threshold=0.3)
         print(f"Processed {image_file} -> {output_path}")
