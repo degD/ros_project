@@ -71,3 +71,17 @@ araştırılmalı.
 ## Kalan işler:
 - Genel düzenleme
 - Belki engelden kaçınma
+
+## Akış
+0. Alan harita üzerinden seçilir
+1. Seçilen alana göre drone gezer (sabit yükseklik olsun)
+2. Araçlar belirlenir 
+3. Plaka okuma yapılır
+
+Önemli bir eksik, haritanın hala tam istediğim gibi olmaması. Araçların plakaları yeterince iyi olmadı. 0. aşama için acele etmeye gerek yok. Önemli olan asıl kısım 1, 2, 3 içeren bir demo yapmak. Burada çeşitli sorunlar var:
+
+- Plakalar TR standartında değil tam
+- Harita tam değil
+- Genel lojik olsa da her şey bağlı değil
+
+İlk ikisi blender ile çözülebilir. Bir test dünyası yapmam süper olur. Sonuncu da zor değil sonra.
