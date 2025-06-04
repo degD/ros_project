@@ -120,6 +120,7 @@ def inference_with_absolute_coordinates(image_filename: str):
                 "x_global": x_g,
                 "y_global": y_g,
                 "altitude": altitude,
+                "angle": angle,
                 "score": score
             })
 
@@ -190,3 +191,5 @@ if __name__ == "__main__":
         output_path = os.path.join(OUTPUT_DIR, f"det_{image_file}")
         draw_detections_on_image(image_file, output_path, score_threshold=0.3)
         print(f"Processed {image_file} -> {output_path}")
+
+    print(simple_inference("image.png"))

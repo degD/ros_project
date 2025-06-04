@@ -311,6 +311,9 @@ def rotateDrone(degrees):
 
 
 def stepRotateDrone(degrees, step=90):
+    if abs(degrees) < abs(step):
+        rotateDrone(degrees)
+        return
     s = 0
     while abs(s) < abs(degrees):
         rotateDrone((degrees / abs(degrees)) * step)
@@ -321,35 +324,23 @@ def stepRotateDrone(degrees, step=90):
 # Rotate around it, maybe with an altitude of 10m or less
 # Get photos of the front and back
 # Then read the plates
-def readCarPlate(carPosition):
+def readCarPlate(car_x, car_y, car_angle):
     """
-    Fly over the car, rotate around it, take photos, and read the plates.
-    Args:
-        carPosition (Point): The (x, y) position of the car.
-    Returns:
-        str: Placeholder for the detected plate text.
+    Move the drone behind the car using car_x, car_y, and car_angle.
+    A placeholder for reading the plate is returned.
     """
-    altitude = 3  # Fixed altitude for rotation
-    rotation_radius = 4  # Distance from the car for rotation
-    rotation_angles = [0, 90, 180, -90]  # Angles to capture front and back photos
+    altitude = 3
+    behind_offset = 4.0
 
-    rospy.loginfo(f"Starting rotation around car at {carPosition}.")
-    for angle in rotation_angles:
-        # Calculate the position based on rotation angle
-        rad = math.radians(angle)
-        target_point = Point(
-            carPosition.x - rotation_radius * math.cos(rad),
-            carPosition.y - rotation_radius * math.sin(rad),
-            altitude
-        )
-        stepMove(target_point)
-        stepRotateDrone(angle)
-        rospy.sleep(1)  # Allow time for stabilization
-        stepRotateDrone(-1*angle)
-        rospy.sleep(1)  # Allow time for stabilization
-        # takePhoto()
+    rad_angle = math.radians(car_angle)
+    behind_x = car_x - behind_offset * math.cos(rad_angle)
+    behind_y = car_y - behind_offset * math.sin(rad_angle)
+    rospy.loginfo(f"Moving behind the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
+    stepMove(Point(behind_x, behind_y, altitude))
+    stepRotateDrone(car_angle)
 
-    rospy.loginfo("Photos taken. Placeholder for plate detection.")
+    # Optionally rotate to face the car, take photos, etc.
+    rospy.loginfo("Drone is behind the car. Placeholder for plate detection.")
     return "PLATE_PLACEHOLDER"
 
 
@@ -382,6 +373,6 @@ if __name__ == "__main__":
     # simpleNavigation([
     #     Point(7, -8, 2)
     # ], image=True)
-    readCarPlate(Point(10, -8, 0))
+    readCarPlate(10, -8, 30)
 
 
