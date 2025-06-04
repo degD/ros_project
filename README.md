@@ -69,5 +69,5 @@ araştırılmalı.
 - Araç tespiti temelde anlaşıldı
 
 ## Kalan işler:
-- Plakayı görmek için hareket
-- Plaka OCR
+- Genel düzenleme
+- Belki engelden kaçınma
