@@ -4,5 +4,5 @@
     "home_point": [51.505, -0.09],
     "period": 60,
     "init_height": 40,
-    "camera_fov": [60, 45]
+    "camera_fov": [60, 60]
 }

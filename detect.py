@@ -16,8 +16,8 @@ DEVICE = 'cuda:0'
 CONFIG_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90.py'
 CHECKPOINT_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90-6d2b2ce0.pth'
 MODEL = init_detector(CONFIG_FILE, CHECKPOINT_FILE, device=DEVICE)
-FOV = [60, 45]  # Later on get it from the config.json
-
+FOV = [60, 60]  # Later on get it from the config.json
+# Camera resolution is 1024x1024
 
 def fov_to_ground_size(
     fov_horizontal_deg: float,
