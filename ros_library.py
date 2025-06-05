@@ -1,4 +1,5 @@
-# import detect
+import detect
+import plate
 import rospy
 from geometry_msgs.msg import Point, PointStamped, Pose, PoseStamped
 import math
@@ -169,7 +170,7 @@ def simpleNavigation(waypoints: list, image=False):
 
 # Subscribe to the topic '/firefly/image_raw' and save the RGB image into 'images' dir.
 # With the drone position (x,y,z) as file name.
-def takePhoto():
+def takePhoto(filename=None):
     bridge = CvBridge()
     latest_image = {"image": None}
     latest_pose = get_current_pose()
@@ -195,7 +196,11 @@ def takePhoto():
 
     # Save the image with the drone's position as the filename
     position = latest_pose.position
-    filename = f"images/{position.x:.2f}_{position.y:.2f}_{position.z:.2f}.png"
+    if not filename:
+        filename = f"images/{position.x:.2f}_{position.y:.2f}_{position.z:.2f}.png"
+    else:
+        filename = f"images/{filename}.png"
+
     os.makedirs("images", exist_ok=True)
     cv2.imwrite(filename, latest_image["image"])
     rospy.loginfo(f"Photo saved as {filename}")
@@ -311,6 +316,9 @@ def rotateDrone(degrees):
 
 
 def stepRotateDrone(degrees, step=90):
+    if abs(degrees) < abs(step):
+        rotateDrone(degrees)
+        return
     s = 0
     while abs(s) < abs(degrees):
         rotateDrone((degrees / abs(degrees)) * step)
@@ -321,67 +329,64 @@ def stepRotateDrone(degrees, step=90):
 # Rotate around it, maybe with an altitude of 10m or less
 # Get photos of the front and back
 # Then read the plates
-def readCarPlate(carPosition):
+def readCarPlate(car_x, car_y, car_angle, save=False):
     """
-    Fly over the car, rotate around it, take photos, and read the plates.
-    Args:
-        carPosition (Point): The (x, y) position of the car.
-    Returns:
-        str: Placeholder for the detected plate text.
+    Move the drone behind the car using car_x, car_y, and car_angle.
+    A placeholder for reading the plate is returned.
     """
-    altitude = 3  # Fixed altitude for rotation
-    rotation_radius = 4  # Distance from the car for rotation
-    rotation_angles = [0, 90, 180, -90]  # Angles to capture front and back photos
+    altitude = 3
+    behind_offset = 4.0
 
-    rospy.loginfo(f"Starting rotation around car at {carPosition}.")
-    for angle in rotation_angles:
-        # Calculate the position based on rotation angle
-        rad = math.radians(angle)
-        target_point = Point(
-            carPosition.x - rotation_radius * math.cos(rad),
-            carPosition.y - rotation_radius * math.sin(rad),
-            altitude
-        )
-        stepMove(target_point)
-        stepRotateDrone(angle)
-        rospy.sleep(1)  # Allow time for stabilization
-        stepRotateDrone(-1*angle)
-        rospy.sleep(1)  # Allow time for stabilization
-        # takePhoto()
+    rad_angle = math.radians(car_angle)
+    behind_x = car_x - behind_offset * math.cos(rad_angle)
+    behind_y = car_y - behind_offset * math.sin(rad_angle)
+    rospy.loginfo(f"Moving behind the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
+    stepMove(Point(behind_x, behind_y, altitude))
+    stepRotateDrone(car_angle)
 
-    rospy.loginfo("Photos taken. Placeholder for plate detection.")
-    return "PLATE_PLACEHOLDER"
+    # Try plate recognizing
+    takePhoto("plate")
+    plateText = plate.plateRecognizerDetect("images/plate.png")
+
+    if save:
+        with open("plates.csv", "a") as f:
+            f.write(f"{car_x},{car_y},{car_angle},{plateText}\n")
+
+    return plateText
+
+
+def resetPlates():
+    """
+    Deletes the plates.csv file if it exists.
+    """
+    filename = "plates.csv"
+    if os.path.exists(filename):
+        try:
+            os.remove(filename)
+            rospy.loginfo(f"Deleted {filename}")
+        except Exception as e:
+            rospy.logerr(f"Failed to delete {filename}: {e}")
+    else:
+        rospy.loginfo(f"No plates.csv file to delete.")
 
 
 if __name__ == "__main__":
 
-    # rospy.init_node("navigation_node", anonymous=True)
-    # resetPhotos()
-    # simpleNavigation([
-    #     Point(20, 0, 60),
-    #     Point(10, 0, 60),
-    #     Point(0, 0, 60),
-    #     Point(-10, 0, 60),
-    #     Point(-20, 0, 60),
-
-    #     Point(0, 20, 60),
-    #     Point(0, 10, 60),
-    #     Point(0, -10, 60),
-    #     Point(0, -20, 60),
-
-    #     Point(10, 10, 60),
-    #     Point(20, 20, 60),
-    #     Point(-10, -10, 60),
-    #     Point(-20, -20, 60),
-    # ], image=True)
-
-    # inferenceImages()
-
     rospy.init_node("navigation_node", anonymous=True)
-    # resetPhotos()
-    # simpleNavigation([
-    #     Point(7, -8, 2)
-    # ], image=True)
-    readCarPlate(Point(10, -8, 0))
 
+    resetPlates()
+    resetPhotos()
+    simpleNavigation([Point(0, 0, 100)], image=True)
 
+    for f in os.listdir("images"):
+        if os.path.isfile(os.path.join("images", f)):
+            image_path = os.path.join("images", f) 
+            abs_coords = detect.inference_with_absolute_coordinates(image_path)
+
+    for detection in abs_coords:
+        readCarPlate(
+            detection["x_global"], 
+            detection["y_global"], 
+            detection["angle"],
+            save=True)
+        
