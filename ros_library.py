@@ -430,7 +430,7 @@ def resetPlates():
 
 if __name__ == "__main__":
 
-    rospy.init_node("navigation_node", anonymous=True)
+    # rospy.init_node("navigation_node", anonymous=True)
 
     resetPlates()
     resetPhotos()
@@ -438,7 +438,7 @@ if __name__ == "__main__":
     simpleNavigation([Point(0, 0, 80)], image=True)
     simpleNavigation([Point(0, 0, 10)], image=False)
     MAX_DIST = 1.0
-    detect.init()
+    # detect.init()
 
     for f in os.listdir("images"):
         detect.draw_detections_on_image(f, f"output/det_{f}")

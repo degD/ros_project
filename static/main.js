@@ -1,8 +1,3 @@
-var map = L.map('map').setView([51.505, -0.09], 13);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-}).addTo(map);
 
 const configData = JSON.parse(document.body.dataset.token);
 const serviceAreaCenter = configData["service_area_center"];
@@ -11,6 +6,13 @@ const cameraFov = configData["camera_fov"];
 const homePoint = configData["home_point"];
 let height = configData["init_height"];
 let period = configData["period"];
+
+
+var map = L.map('map').setView(configData["service_area_center"], 17);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
 
 
 const HEIGHT_MIN = 10;
