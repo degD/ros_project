@@ -99,7 +99,7 @@ def simple_inference(image_filename: str):
     return inference_detector(MODEL, IMAGE_DIR+image_filename)
 
 
-def inference_with_absolute_coordinates(image_filename: str):
+def inference_with_absolute_coordinates(image_filename: str, remove_repetations=False):
     result = simple_inference(image_filename)
 
     # Extract global center and altitude from filename
@@ -131,6 +131,23 @@ def inference_with_absolute_coordinates(image_filename: str):
                 "angle": angle,
                 "score": score
             })
+
+    if remove_repetations and abs_list:
+        threshold = 1.0  # meters, adjust as needed
+        filtered = []
+        for det in abs_list:
+            too_close = False
+            for f in filtered:
+                dx = det["x_global"] - f["x_global"]
+                dy = det["y_global"] - f["y_global"]
+                if (dx ** 2 + dy ** 2) ** 0.5 < threshold:
+                    too_close = True
+                    break
+            if not too_close:
+                filtered.append(det)
+        print(len(abs_list))
+        print(len(filtered))
+        abs_list = filtered
 
     return abs_list
 
@@ -200,4 +217,4 @@ if __name__ == "__main__":
         draw_detections_on_image(image_file, output_path, score_threshold=0.3)
         print(f"Processed {image_file} -> {output_path}")
 
-    print(simple_inference("image.png"))
+    print(simple_inference("output/det_0.11_-0.00_79.90.png.png"))

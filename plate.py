@@ -2,8 +2,8 @@ import requests
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
 
+load_dotenv()
 
 def plateRecognizerDetect(image):
     with open(image, 'rb') as fp:
@@ -12,7 +12,10 @@ def plateRecognizerDetect(image):
             files=dict(upload=fp),
             headers={'Authorization': os.getenv('PLATE')})
 
-    return response.json()["results"][0]["plate"]
+    try:
+        return response.json()["results"][0]["plate"]
+    except:
+        return ""
 
 
 if __name__ == '__main__':

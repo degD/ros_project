@@ -15,7 +15,7 @@
   <joint name="downward_cam_joint" type="fixed">
     <parent link="${namespace}/base_link"/>
     <child link="downward_cam_link"/>
-    <origin xyz="0.0 0.0 -0.05" rpy="0.0 -1.5708 0.0"/>  <!-- Downward-facing (90° pitch) -->
+    <origin xyz="0.0 0.0 -0.05" rpy="0.0 1.5708 0.0"/>  <!-- Downward-facing (90° pitch) -->
   </joint>
 
   <!-- Gazebo camera sensor -->
