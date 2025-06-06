@@ -62,26 +62,21 @@ araştırılmalı.
 2. Gazebo içinden bir mini dünya oluştur.
 
 ## İlerleme:
-- Drone için WBM demosu hazır
-- Drone verileri alıp hareket ediyordu
-- Plakalı araçlar blender ile üretiliyor
-- Basit gazebo haritası hazır
-- Araç tespiti temelde anlaşıldı
+- Basit bir demo hazırlandı. Aşağıdaki sıra ile komutlar çağırılarak demo çalıştırılabilir.
+- Temel akış (eksiklikler olsa da) tamam gibi.
+- Basit WBM var.
 
-## Kalan işler:
-- Genel düzenleme
-- Belki engelden kaçınma
+## Eksikler:
+- WBM ve demo bağımsız.
+- Demo dünya ve araçlar çok basit.
+- Araç textureları bozuk.
+- Drone çok yavaş ve hareket hatalı.
+- Engelden kaçınma mevcut değil.
 
-## Akış
-0. Alan harita üzerinden seçilir
-1. Seçilen alana göre drone gezer (sabit yükseklik olsun)
-2. Araçlar belirlenir 
-3. Plaka okuma yapılır
-
-Önemli bir eksik, haritanın hala tam istediğim gibi olmaması. Araçların plakaları yeterince iyi olmadı. 0. aşama için acele etmeye gerek yok. Önemli olan asıl kısım 1, 2, 3 içeren bir demo yapmak. Burada çeşitli sorunlar var:
-
-- Plakalar TR standartında değil tam
-- Harita tam değil
-- Genel lojik olsa da her şey bağlı değil
-
-İlk ikisi blender ile çözülebilir. Bir test dünyası yapmam süper olur. Sonuncu da zor değil sonra.
+## Demo çalıştırma:
+```
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtiff.so.5
+chmod +x place_sim_files.sh
+./place_sim_files.sh
+roslaunch rotors_gazebo rotors_hovering_vi_extra_camera.launch mav_name:=firefly world_name:=parked_cars_demo
+```
