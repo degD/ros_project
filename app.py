@@ -26,7 +26,7 @@ def navigation():
     # Call the separate ROS script with subprocess
     try:
         os.environ["LD_PRELOAD"] = "/usr/lib/x86_64-linux-gnu/libtiff.so.5"
-        subprocess.Popen(["python3", "main.py"], stdin=subprocess.PIPE)
+        subprocess.Popen(["python", "main.py"], stdin=subprocess.PIPE)
     except Exception as e:
         print(f"Error launching ROS script: {e}")
     
