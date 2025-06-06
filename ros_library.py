@@ -10,7 +10,7 @@ from cv_bridge import CvBridge
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 EPS = 0.5
-MAX_DIST = 10.0  # Maximum distance for each step (adjust as needed)
+MAX_DIST = 1.0  # Maximum distance for each step (adjust as needed)
 INFERENCE_THRESHOLD = 0.5
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
@@ -170,7 +170,7 @@ def simpleNavigation(waypoints: list, image=False):
 
 # Subscribe to the topic '/firefly/image_raw' and save the RGB image into 'images' dir.
 # With the drone position (x,y,z) as file name.
-def takePhoto(filename=None):
+def takePhoto(filename=None, front=False):
     bridge = CvBridge()
     latest_image = {"image": None}
     latest_pose = get_current_pose()
@@ -182,9 +182,14 @@ def takePhoto(filename=None):
     def image_callback(msg):
         latest_image["image"] = bridge.imgmsg_to_cv2(msg, "bgr8")
 
-    sub = rospy.Subscriber('/firefly/image_raw', Image, image_callback)
-    rate = rospy.Rate(10)
-    timeout = rospy.Time.now() + rospy.Duration(2.0)  # 2 seconds timeout
+    if not front:
+        sub = rospy.Subscriber('/firefly/image_raw', Image, image_callback)
+        rate = rospy.Rate(10)
+        timeout = rospy.Time.now() + rospy.Duration(2.0)  # 2 seconds timeout
+    else:
+        sub = rospy.Subscriber('/firefly/vi_sensor/camera_depth/camera/image_raw', Image, image_callback)
+        rate = rospy.Rate(10)
+        timeout = rospy.Time.now() + rospy.Duration(2.0)  # 2 seconds timeout
 
     while not rospy.is_shutdown() and latest_image["image"] is None and rospy.Time.now() < timeout:
         rate.sleep()
@@ -193,6 +198,9 @@ def takePhoto(filename=None):
     if latest_image["image"] is None:
         rospy.logwarn("Could not capture image.")
         return
+    
+    # Enhance brightness and vibrancy
+    latest_image = cv2.convertScaleAbs(latest_image["image"], alpha=1.2, beta=30)
 
     # Save the image with the drone's position as the filename
     position = latest_pose.position
@@ -202,7 +210,7 @@ def takePhoto(filename=None):
         filename = f"images/{filename}.png"
 
     os.makedirs("images", exist_ok=True)
-    cv2.imwrite(filename, latest_image["image"])
+    cv2.imwrite(filename, latest_image)
     rospy.loginfo(f"Photo saved as {filename}")
 
 # Remove all the images in the 'images' folder
@@ -261,7 +269,6 @@ def inferenceImages():
 
     return coords
 
-
 def rotateDrone(degrees):
     """
     Rotates the drone in place by 'degrees' (relative to its current heading).
@@ -283,6 +290,9 @@ def rotateDrone(degrees):
     # Calculate new orientation
     new_yaw = yaw + math.radians(degrees)
     new_q = quaternion_from_euler(roll, pitch, new_yaw)
+
+    if new_yaw >= math.radians(360):
+        new_yaw -= math.radians(360)
 
     # Build a PoseStamped with same position but updated orientation
     pose_stamped = PoseStamped()
@@ -308,6 +318,7 @@ def rotateDrone(degrees):
                   updated_pose.orientation.z,
                   updated_pose.orientation.w)
             _, _, current_yaw = euler_from_quaternion(uq)
+            print(current_yaw, new_yaw)
             if abs(current_yaw - new_yaw) < 0.05:  # Radians threshold
                 arrived = True
         rate.sleep()
@@ -315,14 +326,18 @@ def rotateDrone(degrees):
     rospy.loginfo("Drone rotation complete.")
 
 
-def stepRotateDrone(degrees, step=90):
-    if abs(degrees) < abs(step):
+def stepRotateDrone(degrees, stepsize=90):
+    
+    if degrees < 0:
+        stepsize *= -1
+
+    if -90 <= degrees <= 90:
         rotateDrone(degrees)
-        return
-    s = 0
-    while abs(s) < abs(degrees):
-        rotateDrone((degrees / abs(degrees)) * step)
-        s += step
+    else:
+        times_step = int(degrees // stepsize)
+        angles = [stepsize]*times_step + [degrees - stepsize*times_step]
+        for x in angles:
+            rotateDrone(x)
 
 
 # Fly over the car (for example (10,-8))
@@ -334,25 +349,68 @@ def readCarPlate(car_x, car_y, car_angle, save=False):
     Move the drone behind the car using car_x, car_y, and car_angle.
     A placeholder for reading the plate is returned.
     """
-    altitude = 3
-    behind_offset = 4.0
+    altitude = 10
+    behind_offset = 3
 
-    rad_angle = math.radians(car_angle)
-    behind_x = car_x - behind_offset * math.cos(rad_angle)
-    behind_y = car_y - behind_offset * math.sin(rad_angle)
+    deg_angle = math.degrees(car_angle) - 90
+    behind_x = car_x - behind_offset * math.sin(car_angle)
+    behind_y = car_y + behind_offset * math.cos(car_angle)
     rospy.loginfo(f"Moving behind the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
     stepMove(Point(behind_x, behind_y, altitude))
-    stepRotateDrone(car_angle)
+    stepMove(Point(behind_x, behind_y, 0.7))
+    stepRotateDrone(deg_angle)
 
     # Try plate recognizing
-    takePhoto("plate")
+    takePhoto("plate", front=True)
     plateText = plate.plateRecognizerDetect("images/plate.png")
 
     if save:
         with open("plates.csv", "a") as f:
-            f.write(f"{car_x},{car_y},{car_angle},{plateText}\n")
+            f.write(f"{behind_x},{behind_y},{car_angle},{plateText}\n")
+
+    # Reset rotation
+    stepRotateDrone(-1*deg_angle)
+    stepMove(Point(behind_x, behind_y, altitude))
 
     return plateText
+
+
+def readPlates(abs_coords):
+    """
+    Reads plates starting from the closest coordinate to the drone's current position.
+
+    Args:
+        abs_coords (list): A list of dictionaries containing absolute coordinates with keys:
+            - "x_global": X-coordinate of the detection.
+            - "y_global": Y-coordinate of the detection.
+            - "angle": Angle of the detection.
+    """
+    while abs_coords:
+        current_pose = get_current_pose()
+        if current_pose is None:
+            rospy.logerr("Current pose unavailable. Cannot determine closest coordinate.")
+            return
+
+        # Calculate distances and find the closest coordinate
+        current_x, current_y = current_pose.position.x, current_pose.position.y
+        closest = min(
+            abs_coords,
+            key=lambda detection: math.sqrt(
+                (detection["x_global"] - current_x) ** 2 +
+                (detection["y_global"] - current_y) ** 2
+            )
+        )
+
+        # Process the closest coordinate
+        readCarPlate(
+            closest["x_global"],
+            closest["y_global"],
+            closest["angle"],
+            save=True
+        )
+
+        # Remove the processed coordinate from the list
+        abs_coords.remove(closest)
 
 
 def resetPlates():
@@ -376,17 +434,25 @@ if __name__ == "__main__":
 
     resetPlates()
     resetPhotos()
-    simpleNavigation([Point(0, 0, 100)], image=True)
+    MAX_DIST = 10.0
+    simpleNavigation([Point(0, 0, 80)], image=True)
+    simpleNavigation([Point(0, 0, 10)], image=False)
+    MAX_DIST = 1.0
+    detect.init()
 
     for f in os.listdir("images"):
-        if os.path.isfile(os.path.join("images", f)):
-            image_path = os.path.join("images", f) 
-            abs_coords = detect.inference_with_absolute_coordinates(image_path)
+        detect.draw_detections_on_image(f, f"output/det_{f}")
+        abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
 
-    for detection in abs_coords:
-        readCarPlate(
-            detection["x_global"], 
-            detection["y_global"], 
-            detection["angle"],
-            save=True)
-        
+    # for detection in abs_coords:
+    #     readCarPlate(
+    #         detection["x_global"], 
+    #         detection["y_global"], 
+    #         detection["angle"],
+    #         save=True)
+
+    # simpleNavigation([Point(-16, -4, 20)])
+    # readCarPlate(-14.6, -1.74, 1.51, save=True)
+
+    readPlates(abs_coords)
+

@@ -1,0 +1,22 @@
+<?xml version='1.0'?>
+<sdf version='1.6'>
+  <model name='CarPlated5419'>
+    <static>true</static>
+    <link name='link'>
+      <visual name='visual'>
+        <geometry>
+          <mesh>
+            <uri>model://CarPlated5419/meshes/CarPlated5419.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <collision name='collision'>
+        <geometry>
+          <mesh>
+            <uri>model://CarPlated5419/meshes/CarPlated5419.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
