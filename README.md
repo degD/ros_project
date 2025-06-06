@@ -74,9 +74,19 @@ araştırılmalı.
 - Engelden kaçınma mevcut değil.
 
 ## Demo çalıştırma:
+İlk olarak:
 ```
 export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtiff.so.5
 chmod +x place_sim_files.sh
 ./place_sim_files.sh
+```
+
+Ayrı bir terminalde:
+```
 roslaunch rotors_gazebo rotors_hovering_vi_extra_camera.launch mav_name:=firefly world_name:=parked_cars_demo
+```
+
+Son olarak yine proje içinde:
+```
+python ros_library.py
 ```
