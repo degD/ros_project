@@ -431,29 +431,31 @@ def resetPlates():
 
 if __name__ == "__main__":
 
-    # rospy.init_node("navigation_node", anonymous=True)
+    rospy.init_node("navigation_node", anonymous=True)
 
-    resetPlates()
-    resetPhotos()
-    MAX_DIST = 10.0
-    simpleNavigation([Point(0, 0, 80)], image=True)
-    simpleNavigation([Point(0, 0, 10)], image=False)
-    MAX_DIST = 1.0
-    # detect.init()
+    # resetPlates()
+    # resetPhotos()
+    # MAX_DIST = 10.0
+    # simpleNavigation([Point(0, 0, 80)], image=True)
+    # simpleNavigation([Point(0, 0, 10)], image=False)
+    # MAX_DIST = 1.0
+    # # detect.init()
 
-    for f in os.listdir("images"):
-        detect.draw_detections_on_image(f, f"output/det_{f}")
-        abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
+    # for f in os.listdir("images"):
+    #     detect.draw_detections_on_image(f, f"output/det_{f}")
+    #     abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
 
-    # for detection in abs_coords:
-    #     readCarPlate(
-    #         detection["x_global"], 
-    #         detection["y_global"], 
-    #         detection["angle"],
-    #         save=True)
+    # # for detection in abs_coords:
+    # #     readCarPlate(
+    # #         detection["x_global"], 
+    # #         detection["y_global"], 
+    # #         detection["angle"],
+    # #         save=True)
 
-    # simpleNavigation([Point(-16, -4, 20)])
-    # readCarPlate(-14.6, -1.74, 1.51, save=True)
+    # # simpleNavigation([Point(-16, -4, 20)])
+    # # readCarPlate(-14.6, -1.74, 1.51, save=True)
 
-    readPlates(abs_coords)
+    # readPlates(abs_coords)
 
+
+    simpleMove(Point(7, 0, 2))

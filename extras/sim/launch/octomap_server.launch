@@ -1,0 +1,12 @@
+<launch>
+  <!-- Read a point-cloud stream and build an OctoMap -->
+  <node pkg="octomap_server" type="octomap_server_node" name="octomap_server" output="screen">
+    <!-- Basic parameters -->
+    <param name="frame_id"              value="world"/>   <!-- must match your costmap global_frame -->
+    <param name="resolution"            value="0.10"/>    <!-- voxel size in metres -->
+    <param name="sensor_model/max_range" value="6.0"/>    <!-- ignore returns farther than this -->
+
+    <!-- Remap the input to whatever your depth sensor publishes -->
+    <remap from="cloud_in" to="/firefly/vi_sensor/camera_depth/depth/points"/>
+  </node>
+</launch>

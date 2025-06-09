@@ -31,5 +31,16 @@
     <node name="hovering_example" pkg="rotors_gazebo" type="hovering_example" output="screen"/>
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
     <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
+
+    <!-- TF transform is necessary for depthcloud and presumably occupancy map -->
+    <node pkg="tf" type="static_transform_publisher" name="camera_tf_pub"
+      args="0 0 0 -1.5708 0 -1.5708 firefly/base_link camera_depth_optical_center_link 100" />
+
+    <!-- Octomap launching -->
+    <include file="$(find rotors_gazebo)/launch/octomap_server.launch"/>
+
+    <!-- move_base launching -->
+    <include file="$(find rotors_gazebo)/launch/move_base.launch"/>
+
   </group>
 </launch>

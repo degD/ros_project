@@ -1,0 +1,18 @@
+global_costmap:
+  global_frame: world                     # Same root frame
+  robot_base_frame: firefly/base_link
+
+  update_frequency: 2.0                   # Hz
+  publish_frequency: 0.5
+  transform_tolerance: 0.5
+
+  static_map: false                       # We’re in simulation; no static map
+  rolling_window: false                   # Full map, not a window
+
+  width: 100.0                            # m (planning horizon)
+  height: 100.0
+  resolution: 0.50                        # Coarser than local costmap
+
+  plugins:
+    - {name: voxel_layer,     type: "costmap_2d::VoxelLayer"}
+    - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
