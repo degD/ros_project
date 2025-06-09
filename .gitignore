@@ -1,2 +1,4 @@
 oriented_*
 .env
+output/*
+images/*

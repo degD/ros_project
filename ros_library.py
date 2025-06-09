@@ -344,18 +344,18 @@ def stepRotateDrone(degrees, stepsize=90):
 # Rotate around it, maybe with an altitude of 10m or less
 # Get photos of the front and back
 # Then read the plates
-def readCarPlate(car_x, car_y, car_angle, save=False):
+def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
     """
     Move the drone behind the car using car_x, car_y, and car_angle.
     A placeholder for reading the plate is returned.
     """
-    altitude = 10
-    behind_offset = 3
+    altitude = alt
+    behind_offset = behind
 
     deg_angle = math.degrees(car_angle) - 90
     behind_x = car_x - behind_offset * math.sin(car_angle)
     behind_y = car_y + behind_offset * math.cos(car_angle)
-    rospy.loginfo(f"Moving behind the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
+    rospy.loginfo(f"Moving behind ({behind}) the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
     stepMove(Point(behind_x, behind_y, altitude))
     stepMove(Point(behind_x, behind_y, 0.7))
     stepRotateDrone(deg_angle)
@@ -406,7 +406,8 @@ def readPlates(abs_coords):
             closest["x_global"],
             closest["y_global"],
             closest["angle"],
-            save=True
+            save=True,
+            behind = closest["w_global"] + 1
         )
 
         # Remove the processed coordinate from the list
