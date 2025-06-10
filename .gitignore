@@ -1,2 +1,5 @@
 oriented_*
 .env
+output/*
+images/*
+plates.csv

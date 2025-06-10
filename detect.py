@@ -111,29 +111,50 @@ def inference_with_absolute_coordinates(image_filename: str, remove_repetations=
     # Get image size in pixels
     img_size_px = get_image_size(IMAGE_DIR + image_filename)
 
-    # Compute image size in meters from FOV and altitude
+    # Compute image size in meters
     img_size_m = fov_to_ground_size(FOV[0], FOV[1], altitude)
 
     abs_list = []
+    dist = lambda p1, p2: ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
 
     for class_detections in result:
         for x, y, w, h, angle, score in class_detections:
-            x_g, y_g = pixel_to_global(
-                (x0, y0),
-                (x, y),
-                img_size_px,
-                img_size_m
-            )
+            # Center in global
+            x_g, y_g = pixel_to_global((x0, y0), (x, y), img_size_px, img_size_m)
+
+            # Corners in pixel space (centered at 0,0)
+            px_corners = [(-w/2, -h/2), (w/2, -h/2), (w/2, h/2), (-w/2, h/2)]
+
+            # Rotate corners by 'angle'
+            cos_a = np.cos(angle)
+            sin_a = np.sin(angle)
+            px_rot = [(cx*cos_a - cy*sin_a, cx*sin_a + cy*cos_a) for cx, cy in px_corners]
+
+            # Shift to bounding box center
+            px_world = [(x + rx, y + ry) for rx, ry in px_rot]
+
+            # Convert each corner to global
+            corners_global = [
+                pixel_to_global((x0, y0), pt, img_size_px, img_size_m)
+                for pt in px_world
+            ]
+
+            # Measure global width & height
+            w_global = dist(corners_global[0], corners_global[1])
+            h_global = dist(corners_global[1], corners_global[2])
+
             abs_list.append({
                 "x_global": x_g,
                 "y_global": y_g,
                 "altitude": altitude,
                 "angle": angle,
-                "score": score
+                "score": score,
+                "w_global": w_global/2,
+                "h_global": h_global/2
             })
 
     if remove_repetations and abs_list:
-        threshold = 1.0  # meters, adjust as needed
+        threshold = 1.0
         filtered = []
         for det in abs_list:
             too_close = False
@@ -145,8 +166,6 @@ def inference_with_absolute_coordinates(image_filename: str, remove_repetations=
                     break
             if not too_close:
                 filtered.append(det)
-        print(len(abs_list))
-        print(len(filtered))
         abs_list = filtered
 
     return abs_list
@@ -195,7 +214,7 @@ def draw_detections_on_image(image_filename: str, output_path: str = None, score
         for x, y, w_box, h_box, angle, score in class_detections:
             if score >= score_threshold:
                 draw_rotated_box(draw, x, y, w_box, h_box, angle, outline="lime", width=3)
-
+                draw.ellipse([(x - 1, y - 1), (x + 1, y + 1)], fill="blue", outline="blue")
     if output_path:
         img.save(output_path)
     else:
@@ -209,12 +228,12 @@ if __name__ == "__main__":
 
     # List all image files in the IMAGE_DIR
     # image_files = [f for f in os.listdir(IMAGE_DIR) if f.endswith(".png")]
-    image_files = ["image.png"]
+    image_files = ["0.12_0.00_79.84.png"]
+    init()
 
     for image_file in image_files:
         # Perform inference and draw detection boxes
-        output_path = os.path.join(OUTPUT_DIR, f"det_{image_file}")
-        draw_detections_on_image(image_file, output_path, score_threshold=0.3)
-        print(f"Processed {image_file} -> {output_path}")
-
-    print(simple_inference("output/det_0.11_-0.00_79.90.png.png"))
+        # output_path = os.path.join(OUTPUT_DIR, f"det_{image_file}")
+        # draw_detections_on_image(image_file, output_path, score_threshold=0.3)
+        # print(f"Processed {image_file} -> {output_path}")
+        inference_with_absolute_coordinates(image_file)
