@@ -200,7 +200,7 @@ def takePhoto(filename=None, front=False):
         return
     
     # Enhance brightness and vibrancy
-    latest_image = cv2.convertScaleAbs(latest_image["image"], alpha=1.2, beta=30)
+    # latest_image = cv2.convertScaleAbs(latest_image["image"], alpha=1.2, beta=30)
 
     # Save the image with the drone's position as the filename
     position = latest_pose.position
@@ -210,7 +210,7 @@ def takePhoto(filename=None, front=False):
         filename = f"images/{filename}.png"
 
     os.makedirs("images", exist_ok=True)
-    cv2.imwrite(filename, latest_image)
+    cv2.imwrite(filename, latest_image["image"])
     rospy.loginfo(f"Photo saved as {filename}")
 
 # Remove all the images in the 'images' folder
