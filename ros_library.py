@@ -354,11 +354,11 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
 
     deg_angle = math.degrees(car_angle) - 90
     behind_x = car_x - behind_offset * math.sin(car_angle)
-    behind_y = car_y + behind_offset * math.cos(car_angle)
+    behind_y = car_y - behind_offset * math.cos(car_angle)
     rospy.loginfo(f"Moving behind ({behind}) the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
     stepMove(Point(behind_x, behind_y, altitude))
     stepMove(Point(behind_x, behind_y, 0.7))
-    stepRotateDrone(deg_angle)
+    stepRotateDrone(-1*deg_angle)
 
     # Try plate recognizing
     takePhoto("plate", front=True)
@@ -369,7 +369,7 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
             f.write(f"{behind_x},{behind_y},{car_angle},{plateText}\n")
 
     # Reset rotation
-    stepRotateDrone(-1*deg_angle)
+    stepRotateDrone(deg_angle)
     stepMove(Point(behind_x, behind_y, altitude))
 
     return plateText
