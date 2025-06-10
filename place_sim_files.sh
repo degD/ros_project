@@ -44,5 +44,6 @@ create_links "$SIM_LAUNCH_DIR" "$TARGET_LAUNCH_DIR"
 create_links "$SIM_MODELS_DIR" "$TARGET_MODELS_DIR"
 create_links "$SIM_URDF_DIR" "$TARGET_URDF_DIR"
 create_links "$SIM_WORLDS_DIR" "$TARGET_WORLDS_DIR"
+create_links "$SIM_CONFIG_DIR" "$TARGET_CONFIG_DIR"
 
 echo "All files have been linked successfully."

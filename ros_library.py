@@ -458,4 +458,4 @@ if __name__ == "__main__":
     # readPlates(abs_coords)
 
 
-    simpleMove(Point(7, 0, 2))
+    simpleMove(Point(7, 0, 1))
