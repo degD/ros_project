@@ -366,7 +366,7 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
 
     if save:
         with open("plates.csv", "a") as f:
-            f.write(f"{behind_x},{behind_y},{car_angle},{plateText}\n")
+            f.write(f"{plateText.upper()}\n")
 
     # Reset rotation
     stepRotateDrone(deg_angle)

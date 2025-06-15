@@ -5,6 +5,10 @@ import os
 import pickle
 from geometry_msgs.msg import Point
 
+# Remove completion status
+if os.path.exists("complete.txt"):
+    os.remove("complete.txt")
+
 rospy.init_node("navigation_node", anonymous=True)
 
 ros_library.resetPlates()
@@ -23,3 +27,7 @@ ros_library.simpleNavigation([Point(0, 0, 10)], image=False)
 ros_library.MAX_DIST = 1.0
 
 ros_library.readPlates(abs_coords)
+
+# Plate reading complete
+with open("complete.txt", "w") as f:
+    f.write("DONE")
