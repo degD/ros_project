@@ -234,7 +234,7 @@ if __name__ == "__main__":
     for image_file in image_files:
         # Perform inference and draw detection boxes
         output_path = os.path.join(OUTPUT_DIR, f"detx_{image_file}")
-        draw_detections_on_image("images/0.11_-0.00_79.90.png", "output_path.png", score_threshold=0)
+        draw_detections_on_image("0.11_-0.00_79.90_scurve_bright.png", "output_path.png", score_threshold=0.3)
         print(f"Processed {image_file} -> {output_path}")
         # inference_with_absolute_coordinates(image_file)
     

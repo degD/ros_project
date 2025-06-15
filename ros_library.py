@@ -11,7 +11,7 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 EPS = 0.5
 MAX_DIST = 1.0  # Maximum distance for each step (adjust as needed)
-INFERENCE_THRESHOLD = 0.5
+INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
 
@@ -407,7 +407,7 @@ def readPlates(abs_coords):
             closest["y_global"],
             closest["angle"],
             save=True,
-            behind = closest["w_global"] + 1
+            behind = closest["w_global"] + 1.5
         )
 
         # Remove the processed coordinate from the list
@@ -457,5 +457,5 @@ if __name__ == "__main__":
 
     # readPlates(abs_coords)
 
-
-    simpleMove(Point(7, 0, 1))
+# {'x_global': 24.170509596565196, 'y_global': 6.748032890355546, 'altitude': 79.8, 'angle': 0.5816325, 'score': 0.8759265, 'w_global': 1.9124779614028897, 'h_global': 0.8567711158815933}
+    readCarPlate(24, 6.7, 0.581, save=False, behind=0, alt=5)
