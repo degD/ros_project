@@ -24,8 +24,8 @@
       <camera>
         <horizontal_fov>1.047</horizontal_fov>  <!-- 60° HFOV, means 45° VFOV -->
         <image>
-          <width>1024</width>
-          <height>1024</height>
+          <width>4096</width>
+          <height>4096</height>
           <format>R8G8B8</format>
         </image>
         <clip>
