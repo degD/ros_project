@@ -15,7 +15,7 @@ def plateRecognizerDetect(image):
     try:
         return response.json()["results"][0]["plate"]
     except:
-        return ""
+        return "FAILED"
 
 
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_file
 import json
 import subprocess
 import os
@@ -31,6 +31,19 @@ def navigation():
         print(f"Error launching ROS script: {e}")
     
     return "Received data...", 200
+
+
+@app.route("/navigation_status")
+def navigation_status():
+    if os.path.exists("complete.txt"):
+        return "Navigation complete!", 200
+    else:
+        return "Navigation in progress...", 202
+
+
+@app.route('/plates.csv')
+def download_plates():
+    return send_file('plates.csv', as_attachment=True)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 EPS = 0.5
 MAX_DIST = 1.0  # Maximum distance for each step (adjust as needed)
-INFERENCE_THRESHOLD = 0.5
+INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
 
@@ -230,6 +230,21 @@ def resetPhotos():
             rospy.logerr(f"Failed to delete {file_path}: {e}")
     rospy.loginfo("All images have been deleted.")
 
+def resetOutput():
+    folder = "output"
+    if not os.path.exists(folder):
+        rospy.loginfo(f"No output images to delete. Folder '{folder}' does not exist.")
+        return
+
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+                rospy.loginfo(f"Deleted {file_path}")
+        except Exception as e:
+            rospy.logerr(f"Failed to delete {file_path}: {e}")
+    rospy.loginfo("All output images have been deleted.")
 
 # Run inference on all the images and return their global coordinates
 def inferenceImages():
@@ -354,11 +369,11 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
 
     deg_angle = math.degrees(car_angle) - 90
     behind_x = car_x - behind_offset * math.sin(car_angle)
-    behind_y = car_y + behind_offset * math.cos(car_angle)
+    behind_y = car_y - behind_offset * math.cos(car_angle)
     rospy.loginfo(f"Moving behind ({behind}) the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
     stepMove(Point(behind_x, behind_y, altitude))
     stepMove(Point(behind_x, behind_y, 0.7))
-    stepRotateDrone(deg_angle)
+    stepRotateDrone(-1*deg_angle)
 
     # Try plate recognizing
     takePhoto("plate", front=True)
@@ -366,10 +381,10 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
 
     if save:
         with open("plates.csv", "a") as f:
-            f.write(f"{behind_x},{behind_y},{car_angle},{plateText}\n")
+            f.write(f"{plateText.upper()}\n")
 
     # Reset rotation
-    stepRotateDrone(-1*deg_angle)
+    stepRotateDrone(deg_angle)
     stepMove(Point(behind_x, behind_y, altitude))
 
     return plateText
@@ -407,7 +422,7 @@ def readPlates(abs_coords):
             closest["y_global"],
             closest["angle"],
             save=True,
-            behind = closest["w_global"] + 1
+            behind = closest["w_global"] + 1.5
         )
 
         # Remove the processed coordinate from the list
@@ -457,5 +472,5 @@ if __name__ == "__main__":
 
     # readPlates(abs_coords)
 
-
-    simpleMove(Point(7, 0, 1))
+# {'x_global': 24.170509596565196, 'y_global': 6.748032890355546, 'altitude': 79.8, 'angle': 0.5816325, 'score': 0.8759265, 'w_global': 1.9124779614028897, 'h_global': 0.8567711158815933}
+    readCarPlate(24, 6.7, 0.581, save=False, behind=0, alt=5)

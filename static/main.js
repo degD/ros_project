@@ -268,6 +268,9 @@ startBtn.addEventListener("click", () => {
 
     startBtn.disabled = true;
     stopBtn.disabled = false;
+
+    // Polling for completion of navigation
+    startPollingStatus()
 });
 
 
@@ -275,8 +278,37 @@ stopBtn.addEventListener("click", () => {
 
     clearInterval(interval);
     clearInterval(counterInterval);
+    clearInterval(pollInterval); // Stop polling status
     startBtn.disabled = false;
     stopBtn.disabled = true;
 });
 
 
+// Poll navigation status every second
+let pollInterval = null;
+
+function startPollingStatus() {
+    pollInterval = setInterval(() => {
+        fetch('/navigation_status')
+            .then(response => response.text().then(text => ({ status: response.status, text })))
+            .then(({ status, text }) => {
+                if (status === 200 && text.includes("complete")) {
+                    alert("Navigation complete!");
+                    clearInterval(pollInterval);
+
+                    // Trigger download of plates.csv
+                    const link = document.createElement('a');
+                    link.href = '/plates.csv';
+                    link.download = 'plates.csv';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } else {
+                    console.log("Navigation in progress...");
+                }
+            })
+            .catch(error => {
+                console.error("Error polling navigation status:", error);
+            });
+    }, 1000);
+}
