@@ -11,6 +11,7 @@ if os.path.exists("complete.txt"):
 
 rospy.init_node("navigation_node", anonymous=True)
 
+ros_library.resetOutput()
 ros_library.resetPlates()
 ros_library.resetPhotos()
 ros_library.MAX_DIST = 10.0

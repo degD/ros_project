@@ -230,6 +230,21 @@ def resetPhotos():
             rospy.logerr(f"Failed to delete {file_path}: {e}")
     rospy.loginfo("All images have been deleted.")
 
+def resetOutput():
+    folder = "output"
+    if not os.path.exists(folder):
+        rospy.loginfo(f"No output images to delete. Folder '{folder}' does not exist.")
+        return
+
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+                rospy.loginfo(f"Deleted {file_path}")
+        except Exception as e:
+            rospy.logerr(f"Failed to delete {file_path}: {e}")
+    rospy.loginfo("All output images have been deleted.")
 
 # Run inference on all the images and return their global coordinates
 def inferenceImages():
