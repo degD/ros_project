@@ -90,3 +90,51 @@ Son olarak yine proje içinde:
 ```
 python ros_library.py
 ```
+
+## KALAN İŞLER
+
+### 1. Lokal engelden kaçınma ve rota algoritması
+- Octomap veya PX4 kullanılabilir. Hedef nokta için engeller hesaba katılarak rota çizer
+- Engelleri anlamak için droneun hareket ettiği yöne doğru bakması lazım
+- Bu da tüm hareket sisteminin yeniden yazılması anlamına geliyor
+- Belki mavros ve entegre engelden kaçınması da kullanılabilir
+- Denenen yöntem: depthpoint + octomap ile occupancy grid, occupancy grid'den de costmap
+- Ama costmap çalışmıyor
+
+### 2. WebUI iyileştirmeleri
+- Harita üzerinde drone, tespit edilen araçlar, merkez, plakalar vs. gözüksün
+- CONFIG dosyasını library vs. de okusun
+- Alan çizmede servis alanı sınırı
+- Kareleri ziyaret etmeyi harita olmasa da yap
+- Periot mantığını kontrol et
+- Arayüz iyileştirmesi
+
+### 3. Harita geliştirmeleri
+- Artık WebUI daha iyi. Buna katkı için harita da geliştirilebilir
+- Gazebo performansı nasıl iyileştirilir?
+- Her kare yaklaşık 92m2, 4 kare istesek bu alan gazebo'da nasıl çalışır?
+- Gezinme sonunda drone servis merkezi yani ev konumuna dönsün
+
+### 4. Drone hareket iyileştirmeleri
+- Eğer engelden kaçınma bu işin çözümü için yeterli olmadıysa dronun sallanmasını engelle
+- Hızlı hareket etmesini sağla
+
+### 5. Rapor güncelleme
+- Raporda eksikler ve yanlışlar olabilir. Baştan sona gözden geçir.
+- Raporu tekrar oluştur.
+- Makale için de geçerli.
+
+### 6. Araç tespit iyileştirmeleri
+- mmrotate özellikle siyah arabaları algılamıyor. Buna çözüm üret.
+- Modeller ve yöntemler dene.
+- Plaka okumayı geliştir. Plakayı izole etmeyi dene.
+- Plaka okuma için lokal model bul.
+
+### 6. WSL ile Windows üzerinde kurulum, oto kurulum ve talimatlar
+- Eğer zaman kalırsa WSL ile kurulum yap. Bu performansı arttırabilir.
+- Tüm sistemin kurulumunu otomatikleştir. En baştan ROS kurup, demo çalışacak hale kadar.
+- Güzel bir README yaz. Her şeyi birleştir.
+
+### 7. Genel kod iyileştirmeleri
+- Eğer hepsi bittiyse, güzel bir rewrite yapılabilir.
+- Comment vs. düzelt. 
