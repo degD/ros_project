@@ -451,25 +451,35 @@ function drawCarRectangles() {
 
             // Determine color based on plate status
             let color = "orange";
+            let plateText = "Not read yet";
             if (plateMap.has(index)) {
                 const plate = plateMap.get(index);
-                if (plate === "FAILED") color = "red";
-                else if (plate === "DISABLED") color = "blue";
-                else color = "green";
+                if (plate === "FAILED") {
+                    color = "red";
+                    plateText = "Plate reading failed";
+                } else if (plate === "DISABLED") {
+                    color = "blue";
+                    plateText = "Plate reading disabled";
+                } else {
+                    color = "green";
+                    plateText = `Plate: ${plate}`;
+                }
             }
 
             // Draw rectangle
-            L.polygon(corners, {
+            const rectangle = L.polygon(corners, {
                 color: color,
                 weight: 1,
                 fillOpacity: 0.2
             }).addTo(window.carRectsGroup);
+
+            // Bind popup with plate information
+            rectangle.bindPopup(plateText);
         });
     });
 }
 setInterval(drawCarRectangles, 2000);
 drawCarRectangles();
-
 
 // Add car color legend overlay
 const legend = L.control({position: 'topright'});
