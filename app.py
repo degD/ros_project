@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, send_file, jsonify
 import json
 import subprocess
 import os
-import pickle
+import json
 import numpy as np
 
 def convert_numpy(obj):
@@ -75,8 +75,8 @@ def get_drone_position():
 @app.route('/get_car_locations')
 def get_car_locations():
     try:
-        with open("coords.pickle", "rb") as f:
-            car_locations = pickle.load(f)
+        with open("coords.json", "rb") as f:
+            car_locations = json.load(f)
         car_locations = convert_numpy(car_locations)
         return jsonify(car_locations)
     except FileNotFoundError:
