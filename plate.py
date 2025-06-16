@@ -19,4 +19,4 @@ def plateRecognizerDetect(image):
 
 
 if __name__ == '__main__':
-    print(plateRecognizerDetect('plate2.png'))
+    print(plateRecognizerDetect('images/plate.png'))

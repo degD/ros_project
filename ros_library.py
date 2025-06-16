@@ -10,7 +10,7 @@ from cv_bridge import CvBridge
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 EPS = 0.5
-MAX_DIST = 1.0  # Maximum distance for each step (adjust as needed)
+MAX_DIST = 2.0  # Maximum distance for each step
 INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
@@ -103,7 +103,7 @@ def simpleMove(point: Point):
         latest_pose["pose"] = msg
 
     sub = rospy.Subscriber('/firefly/ground_truth/pose', Pose, pose_callback)
-    rate = rospy.Rate(10)
+    rate = rospy.Rate(40)
     arrived = False
 
     rospy.loginfo("Waiting for the robot to arrive...")
@@ -424,7 +424,7 @@ def readPlates(abs_coords):
             closest["x_global"],
             closest["y_global"],
             closest["angle"],
-            save=False,
+            save=True,
             behind = closest["w_global"] + 1.5
         )
 
