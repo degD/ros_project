@@ -10,7 +10,7 @@ from cv_bridge import CvBridge
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 EPS = 0.5
-MAX_DIST = 2.0  # Maximum distance for each step
+MAX_DIST = 5.0  # Maximum distance for each step
 INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
@@ -425,7 +425,7 @@ def readPlates(abs_coords):
             closest["y_global"],
             closest["angle"],
             save=True,
-            behind = closest["w_global"] + 1.5
+            behind = closest["w_global"] + 1.4
         )
 
         # Remove the processed coordinate from the list

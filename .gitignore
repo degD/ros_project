@@ -3,4 +3,5 @@ oriented_*
 output/*
 images/*
 plates.csv
+plates.txt
 *.pickle
