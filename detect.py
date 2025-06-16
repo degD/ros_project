@@ -1,6 +1,5 @@
 from typing import Tuple
 from mmdet.apis import init_detector, inference_detector
-import mmrotate
 import warnings
 from pathlib import Path
 from PIL import Image, ImageDraw
@@ -23,7 +22,7 @@ def init():
     CONFIG_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90.py'
     CHECKPOINT_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90-6d2b2ce0.pth'
     MODEL = init_detector(CONFIG_FILE, CHECKPOINT_FILE, device=DEVICE)
-    FOV = [60, 60]  # Later on get it from the config.json
+    FOV = [60, 60]
     # Camera resolution is 1024x1024
 
 

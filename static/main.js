@@ -35,6 +35,13 @@ var circle = L.circle(serviceAreaCenter, {
     radius: serviceAreaRadius
 }).addTo(map);
 
+L.circleMarker(serviceAreaCenter, {
+    radius: 6,
+    color: 'red',
+    fillColor: '#f03',
+    fillOpacity: 1
+}).addTo(map);
+
 
 let tileLayerGroup = L.layerGroup().addTo(map);
 let area = null;               // Final completed polygon
