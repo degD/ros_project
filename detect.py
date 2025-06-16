@@ -223,9 +223,11 @@ def draw_detections_on_image(image_filename: str, output_path: str = None, score
 
 if __name__ == "__main__":
     init()
-    IMAGE_DIR = ""
+    IMAGE_DIR = "images/"
     OUTPUT_DIR = "output/"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    inference_with_absolute_coordinates("0.11_-0.00_79.92.png")
 
     # List all image files in the IMAGE_DIR
     # image_files = [f for f in os.listdir(IMAGE_DIR) if f.endswith(".png")]

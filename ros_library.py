@@ -164,7 +164,7 @@ def simpleNavigation(waypoints: list, image=False):
         rospy.loginfo(f"Moving to waypoint #{i}/{wpNum}...")
         stepMove(wp)
         if image:
-            rospy.sleep(1)
+            rospy.sleep(3)
             takePhoto()
 
 
@@ -370,6 +370,8 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
     deg_angle = math.degrees(car_angle) - 90
     behind_x = car_x - behind_offset * math.sin(car_angle)
     behind_y = car_y - behind_offset * math.cos(car_angle)
+    # behind_x = car_x
+    # behind_y = car_y
     rospy.loginfo(f"Moving behind ({behind}) the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
     stepMove(Point(behind_x, behind_y, altitude))
     stepMove(Point(behind_x, behind_y, 0.7))
@@ -378,9 +380,10 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
     # Try plate recognizing
     takePhoto("plate", front=True)
     plateText = plate.plateRecognizerDetect("images/plate.png")
+    # plateText = "FAILED"
 
     if save:
-        with open("plates.csv", "a") as f:
+        with open("plates.txt", "a") as f:
             f.write(f"{plateText.upper()}\n")
 
     # Reset rotation
@@ -421,7 +424,7 @@ def readPlates(abs_coords):
             closest["x_global"],
             closest["y_global"],
             closest["angle"],
-            save=True,
+            save=False,
             behind = closest["w_global"] + 1.5
         )
 
@@ -431,9 +434,9 @@ def readPlates(abs_coords):
 
 def resetPlates():
     """
-    Deletes the plates.csv file if it exists.
+    Deletes the plates.txt file if it exists.
     """
-    filename = "plates.csv"
+    filename = "plates.txt"
     if os.path.exists(filename):
         try:
             os.remove(filename)
@@ -441,7 +444,7 @@ def resetPlates():
         except Exception as e:
             rospy.logerr(f"Failed to delete {filename}: {e}")
     else:
-        rospy.loginfo(f"No plates.csv file to delete.")
+        rospy.loginfo(f"No plates.txt file to delete.")
 
 
 if __name__ == "__main__":
