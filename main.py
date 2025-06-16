@@ -25,7 +25,7 @@ for f in os.listdir("images"):
         pickle.dump(abs_coords, f)
 
 ros_library.simpleNavigation([Point(0, 0, 10)], image=False)
-ros_library.MAX_DIST = 1.0
+ros_library.MAX_DIST = 3.0
 
 ros_library.readPlates(abs_coords)
 

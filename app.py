@@ -41,9 +41,9 @@ def navigation_status():
         return "Navigation in progress...", 202
 
 
-@app.route('/plates.csv')
+@app.route('/plates.txt')
 def download_plates():
-    return send_file('plates.csv', as_attachment=True)
+    return send_file('plates.txt', as_attachment=True)
 
 
 if __name__ == "__main__":

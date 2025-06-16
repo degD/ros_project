@@ -298,8 +298,8 @@ function startPollingStatus() {
 
                     // Trigger download of plates.csv
                     const link = document.createElement('a');
-                    link.href = '/plates.csv';
-                    link.download = 'plates.csv';
+                    link.href = '/plates.txt';
+                    link.download = 'plates.txt';
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
