@@ -83,6 +83,34 @@ droneMarker = L.circleMarker(serviceAreaCenter, {
 }).addTo(map);
 
 
+// Add drone altitude overlay
+const altitudeControl = L.control({position: 'bottomright'});
+
+altitudeControl.onAdd = function (map) {
+    const div = L.DomUtil.create('div', 'info altitude');
+    div.style.background = 'white';
+    div.style.padding = '8px';
+    div.style.borderRadius = '6px';
+    div.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+    div.innerHTML = `<b>Drone Altitude:</b> <span id="drone-altitude">-</span> m`;
+    return div;
+};
+
+altitudeControl.addTo(map);
+
+function updateDroneAltitude() {
+    fetch('/get_drone_position')
+        .then(response => response.json())
+        .then(pos => {
+            document.getElementById("drone-altitude").textContent =
+                (typeof pos.z === "number") ? pos.z.toFixed(2) : "-";
+        });
+}
+
+setInterval(updateDroneAltitude, 2000);
+updateDroneAltitude();
+
+
 let tileLayerGroup = L.layerGroup().addTo(map);
 let area = null;               // Final completed polygon
 let tempPreview = null;        // Temporary polygon while drawing
@@ -362,57 +390,96 @@ function startPollingStatus() {
 
 
 function drawCarRectangles() {
-    fetch('/get_car_locations')
-        .then(response => response.json())
-        .then(carLocations => {
-            // Remove old rectangles if needed
-            if (window.carRectsGroup) {
-                map.removeLayer(window.carRectsGroup);
-            }
-            window.carRectsGroup = L.layerGroup().addTo(map);
-
-            carLocations.forEach(car => {
-                // Rectangle center in meters (relative to service area center)
-                const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
-                const carCenter = {
-                    x: centerMeters.x + car.x_global,
-                    y: centerMeters.y + car.y_global
-                };
-
-                // Rectangle parameters
-                const w = car.h_global*2;
-                const h = car.w_global*2;
-                const angle = car.angle; // radians
-
-                // Compute rectangle corners (relative to center)
-                const dx = w / 2;
-                const dy = h / 2;
-
-                // Rotation matrix
-                const cosA = Math.cos(angle);
-                const sinA = Math.sin(angle);
-
-                // Rectangle corners (clockwise)
-                const corners = [
-                    {x: -dx, y: -dy},
-                    {x: dx, y: -dy},
-                    {x: dx, y: dy},
-                    {x: -dx, y: dy}
-                ].map(corner => {
-                    // Rotate and translate
-                    const x_rot = corner.x * cosA - corner.y * sinA + carCenter.x;
-                    const y_rot = corner.x * sinA + corner.y * cosA + carCenter.y;
-                    return metersToLatlng({x: x_rot, y: y_rot});
-                });
-
-                // Draw rectangle
-                L.polygon(corners, {
-                    color: 'orange',
-                    weight: 1,
-                    fillOpacity: 0.2
-                }).addTo(window.carRectsGroup);
-            });
+    // Fetch both car locations and plates
+    Promise.all([
+        fetch('/get_car_locations').then(r => r.json()),
+        fetch('/get_car_plates').then(r => r.json())
+    ]).then(([carLocations, platesList]) => {
+        // Build a map from index to plate
+        const plateMap = new Map();
+        platesList.forEach(([idx, plate]) => {
+            plateMap.set(Number(idx), plate);
         });
+
+        // Remove old rectangles if needed
+        if (window.carRectsGroup) {
+            map.removeLayer(window.carRectsGroup);
+        }
+        window.carRectsGroup = L.layerGroup().addTo(map);
+
+        carLocations.forEach((car, index) => {
+            // Rectangle center in meters (relative to service area center)
+            const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
+            const carCenter = {
+                x: centerMeters.x + car.x_global,
+                y: centerMeters.y + car.y_global
+            };
+
+            // Rectangle parameters
+            const w = car.h_global * 2;
+            const h = car.w_global * 2;
+            const angle = car.angle; // radians
+
+            // Compute rectangle corners (relative to center)
+            const dx = w / 2;
+            const dy = h / 2;
+
+            // Rotation matrix
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+
+            // Rectangle corners (clockwise)
+            const corners = [
+                {x: -dx, y: -dy},
+                {x: dx, y: -dy},
+                {x: dx, y: dy},
+                {x: -dx, y: dy}
+            ].map(corner => {
+                // Rotate and translate
+                const x_rot = corner.x * cosA - corner.y * sinA + carCenter.x;
+                const y_rot = corner.x * sinA + corner.y * cosA + carCenter.y;
+                return metersToLatlng({x: x_rot, y: y_rot});
+            });
+
+            // Determine color based on plate status
+            let color = "orange";
+            if (plateMap.has(index)) {
+                const plate = plateMap.get(index);
+                if (plate === "FAILED") color = "red";
+                else if (plate === "DISABLED") color = "blue";
+                else color = "green";
+            }
+
+            // Draw rectangle
+            L.polygon(corners, {
+                color: color,
+                weight: 1,
+                fillOpacity: 0.2
+            }).addTo(window.carRectsGroup);
+        });
+    });
 }
 setInterval(drawCarRectangles, 2000);
-drawCarRectangles()
+drawCarRectangles();
+
+
+// Add car color legend overlay
+const legend = L.control({position: 'topright'});
+
+legend.onAdd = function (map) {
+    const div = L.DomUtil.create('div', 'info legend');
+    div.style.background = 'white';
+    div.style.padding = '8px';
+    div.style.borderRadius = '6px';
+    div.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+    div.innerHTML = `
+        <b>Car Plate Status</b><br>
+        <i style="background: orange; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> Not read<br>
+        <i style="background: red; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> FAILED<br>
+        <i style="background: blue; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> DISABLED<br>
+        <i style="background: green; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> Success
+    `;
+    return div;
+};
+
+legend.addTo(map);

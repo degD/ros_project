@@ -4,6 +4,19 @@ import rospy
 import os
 import json
 from geometry_msgs.msg import Point
+import numpy as np
+
+def convert_numpy(obj):
+    if isinstance(obj, dict):
+        return {k: convert_numpy(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy(i) for i in obj]
+    elif isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    else:
+        return obj
 
 # Remove completion status
 if os.path.exists("complete.txt"):
@@ -21,8 +34,9 @@ detect.init()
 for f in os.listdir("images"):
     detect.draw_detections_on_image(f, f"output/det_{f}")
     abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
-    with open("coords.json", "wb") as f:
-        json.dump(abs_coords, f)
+    abs_coords = convert_numpy(abs_coords)  # Convert before saving
+    with open("coords.json", "w") as f:
+        json.dump(abs_coords, f, indent=2)
 
 ros_library.simpleNavigation([Point(0, 0, 10)], image=False)
 ros_library.MAX_DIST = 3.0

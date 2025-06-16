@@ -4,6 +4,7 @@ import subprocess
 import os
 import json
 import numpy as np
+import csv
 
 def convert_numpy(obj):
     if isinstance(obj, dict):
@@ -79,6 +80,22 @@ def get_car_locations():
             car_locations = json.load(f)
         car_locations = convert_numpy(car_locations)
         return jsonify(car_locations)
+    except FileNotFoundError:
+        return jsonify([]) 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+
+@app.route('/get_car_plates')
+def get_car_plates():
+    try:
+        result = []
+        with open("plates.txt", "r") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) >= 2:
+                    result.append([int(row[0]), row[1]])
+        return jsonify(result)
     except FileNotFoundError:
         return jsonify([]) 
     except Exception as e:
