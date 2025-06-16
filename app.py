@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, send_file, jsonify
 import json
 import subprocess
+from dotenv import load_dotenv
 import os
 import json
 import numpy as np
@@ -17,6 +18,11 @@ def convert_numpy(obj):
         return obj
     
 
+
+load_dotenv()
+MAPTILER_KEY = os.getenv("MAPTILER_KEY")
+    
+
 app = Flask(__name__)
 
 @app.route("/")
@@ -24,7 +30,7 @@ def home():
     try:
         with open("config.json") as fp:
             data = json.load(fp)
-        return render_template("index.html", config_data=json.dumps(data))
+        return render_template("index.html", config_data=json.dumps(data), maptile_key=MAPTILER_KEY)
     except FileNotFoundError:
         return "Configuration file not found.", 404
 

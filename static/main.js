@@ -6,13 +6,21 @@ const cameraFov = configData["camera_fov"];
 const homePoint = configData["home_point"];
 let height = configData["init_height"];
 let period = configData["period"];
-
+const MAPTILER_KEY = document.body.dataset.maptileKey;
 
 var map = L.map('map').setView(configData["service_area_center"], 17);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+
+// Less detail, but much higher max zoom
+L.tileLayer(`https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, {
+    maxZoom: 22,
+    attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a>'
 }).addTo(map);
+
+// Better details, free OSM, but less max zoom
+// L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+//     maxZoom: 19,
+//     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+// }).addTo(map);
 
 
 const HEIGHT_MIN = 10;
