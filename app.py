@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, jsonify
 import json
 import subprocess
 import os
@@ -44,6 +44,19 @@ def navigation_status():
 @app.route('/plates.txt')
 def download_plates():
     return send_file('plates.txt', as_attachment=True)
+
+
+drone_position = {"x": 0, "y": 0, "z": 0}
+
+@app.route('/update_drone_position', methods=['POST'])
+def update_drone_position():
+    data = request.json
+    drone_position.update(data)
+    return jsonify({"status": "ok"})
+
+@app.route('/get_drone_position')
+def get_drone_position():
+    return jsonify(drone_position)
 
 
 if __name__ == "__main__":

@@ -8,13 +8,15 @@ import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
+import requests
 
 EPS = 0.5
 MAX_DIST = 5.0  # Maximum distance for each step
 INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
-
+URL_POS = "http://localhost:5000/update_drone_position"  
+PLATE = False   # as a result makes plate texts DISABLED and skips recognizing plates.
 
 def get_current_pose():
     """
@@ -36,6 +38,18 @@ def get_current_pose():
     if latest_pose["pose"] is None:
         rospy.logwarn("Could not get current pose.")
     return latest_pose["pose"]
+
+def send_position_to_flask():
+    pose = get_current_pose()
+    if pose is None:
+        return
+    pos = pose.position
+    url = URL_POS
+    data = {"x": pos.x, "y": pos.y, "z": pos.z}
+    try:
+        requests.post(url, json=data)
+    except Exception as e:
+        rospy.logerr(f"Failed to send position to Flask: {e}")
 
 def stepMove(target_point: Point):
     """
@@ -121,6 +135,7 @@ def simpleMove(point: Point):
 
     rospy.loginfo("Robot has arrived at the target point.")
     sub.unregister()
+    send_position_to_flask()
 
 
 def convertNavDataToWaypoints(navData):
@@ -378,9 +393,11 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
     stepRotateDrone(-1*deg_angle)
 
     # Try plate recognizing
-    takePhoto("plate", front=True)
-    plateText = plate.plateRecognizerDetect("images/plate.png")
-    # plateText = "FAILED"
+    if PLATE:
+        takePhoto("plate", front=True)
+        plateText = plate.plateRecognizerDetect("images/plate.png")
+    else:
+        plateText = "DISABLED"
 
     if save:
         with open("plates.txt", "a") as f:
