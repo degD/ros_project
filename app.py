@@ -2,6 +2,19 @@ from flask import Flask, render_template, request, send_file, jsonify
 import json
 import subprocess
 import os
+import pickle
+import numpy as np
+
+def convert_numpy(obj):
+    if isinstance(obj, dict):
+        return {k: convert_numpy(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy(i) for i in obj]
+    elif isinstance(obj, np.generic):
+        return obj.item()
+    else:
+        return obj
+    
 
 app = Flask(__name__)
 
@@ -57,6 +70,19 @@ def update_drone_position():
 @app.route('/get_drone_position')
 def get_drone_position():
     return jsonify(drone_position)
+
+
+@app.route('/get_car_locations')
+def get_car_locations():
+    try:
+        with open("coords.pickle", "rb") as f:
+            car_locations = pickle.load(f)
+        car_locations = convert_numpy(car_locations)
+        return jsonify(car_locations)
+    except FileNotFoundError:
+        return jsonify([]) 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

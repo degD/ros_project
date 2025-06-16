@@ -359,3 +359,60 @@ function startPollingStatus() {
             });
     }, 1000);
 }
+
+
+function drawCarRectangles() {
+    fetch('/get_car_locations')
+        .then(response => response.json())
+        .then(carLocations => {
+            // Remove old rectangles if needed
+            if (window.carRectsGroup) {
+                map.removeLayer(window.carRectsGroup);
+            }
+            window.carRectsGroup = L.layerGroup().addTo(map);
+
+            carLocations.forEach(car => {
+                // Rectangle center in meters (relative to service area center)
+                const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
+                const carCenter = {
+                    x: centerMeters.x + car.x_global,
+                    y: centerMeters.y + car.y_global
+                };
+
+                // Rectangle parameters
+                const w = car.h_global*2;
+                const h = car.w_global*2;
+                const angle = car.angle; // radians
+
+                // Compute rectangle corners (relative to center)
+                const dx = w / 2;
+                const dy = h / 2;
+
+                // Rotation matrix
+                const cosA = Math.cos(angle);
+                const sinA = Math.sin(angle);
+
+                // Rectangle corners (clockwise)
+                const corners = [
+                    {x: -dx, y: -dy},
+                    {x: dx, y: -dy},
+                    {x: dx, y: dy},
+                    {x: -dx, y: dy}
+                ].map(corner => {
+                    // Rotate and translate
+                    const x_rot = corner.x * cosA - corner.y * sinA + carCenter.x;
+                    const y_rot = corner.x * sinA + corner.y * cosA + carCenter.y;
+                    return metersToLatlng({x: x_rot, y: y_rot});
+                });
+
+                // Draw rectangle
+                L.polygon(corners, {
+                    color: 'orange',
+                    weight: 1,
+                    fillOpacity: 0.2
+                }).addTo(window.carRectsGroup);
+            });
+        });
+}
+setInterval(drawCarRectangles, 2000);
+drawCarRectangles()
