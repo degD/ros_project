@@ -5,6 +5,19 @@ import os
 import json
 from geometry_msgs.msg import Point
 import numpy as np
+import sys
+
+
+# Navigation data
+data = json.load(sys.stdin)
+# Coordinate system of tile
+#        +y
+#        |
+# -x <-- 0 -- +x
+#        |
+#       -y
+
+
 
 def convert_numpy(obj):
     if isinstance(obj, dict):
@@ -28,20 +41,24 @@ ros_library.resetOutput()
 ros_library.resetPlates()
 ros_library.resetPhotos()
 ros_library.MAX_DIST = 10.0
-ros_library.simpleNavigation([Point(0, 0, 80)], image=True)
+
+# Now visit and take photos of all the tiles
+points = [Point(tile["x"], tile["y"], data["height"]) for tile in data["tiles"]]
+ros_library.simpleNavigation(points, image=True)
 
 detect.init()
+all_abs_coords = []
 for f in os.listdir("images"):
     detect.draw_detections_on_image(f, f"output/det_{f}")
     abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
     abs_coords = convert_numpy(abs_coords)  # Convert before saving
-    with open("coords.json", "w") as f:
-        json.dump(abs_coords, f, indent=2)
+    all_abs_coords.extend(abs_coords)
 
-ros_library.simpleNavigation([Point(0, 0, 10)], image=False)
+with open("coords.json", "w") as f:
+    json.dump(all_abs_coords, f, indent=2)
+
 ros_library.MAX_DIST = 3.0
-
-ros_library.readPlates(abs_coords)
+ros_library.readPlates(all_abs_coords)
 
 # Plate reading complete
 with open("complete.txt", "w") as f:
