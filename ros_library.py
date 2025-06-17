@@ -471,6 +471,7 @@ def resetPlates():
 if __name__ == "__main__":
 
     rospy.init_node("navigation_node", anonymous=True)
+    stepMove(Point(0, 0, 10))
 
     # resetPlates()
     # resetPhotos()
@@ -497,4 +498,4 @@ if __name__ == "__main__":
     # readPlates(abs_coords)
 
 # {'x_global': 24.170509596565196, 'y_global': 6.748032890355546, 'altitude': 79.8, 'angle': 0.5816325, 'score': 0.8759265, 'w_global': 1.9124779614028897, 'h_global': 0.8567711158815933}
-    readCarPlate(24, 6.7, 0.581, save=False, behind=0, alt=5)
+    # readCarPlate(24, 6.7, 0.581, save=False, behind=0, alt=5)
