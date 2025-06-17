@@ -64,3 +64,7 @@ ros_library.readPlates(all_abs_coords)
 # Plate reading complete
 with open("complete.txt", "w") as f:
     f.write("DONE")
+
+# Return to home after reading all the plates, and wait until the next period
+# h = 10 for sim, make it land and stop later
+ros_library.simpleNavigation([Point(data["home"]["x"], data["home"]["y"], 10)])

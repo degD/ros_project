@@ -117,6 +117,12 @@ let tempPreview = null;        // Temporary polygon while drawing
 let drawStatus = 0;            // 0 = not drawing, 1 = drawing
 let currentPoints = [];
 
+const startBtn = document.getElementById("start-button");
+const stopBtn = document.getElementById("stop-button");
+
+startBtn.disabled = true;
+stopBtn.disabled = true;
+
 const button = document.getElementById("draw-area-button");
 
 button.addEventListener("click", () => {
@@ -135,6 +141,7 @@ button.addEventListener("click", () => {
 
         drawStatus = 1;
         button.textContent = "Complete";
+        startBtn.disabled = true; // Disable start while drawing
     } else {
         if (currentPoints.length >= 3) {
             if (tempPreview) {
@@ -158,12 +165,19 @@ button.addEventListener("click", () => {
                 currentPoints = [];
                 drawStatus = 0;
                 button.textContent = "Draw Area";
+                startBtn.disabled = true; // Keep start disabled if invalid
                 return;
             }
 
             const tile = projectedAreaFromHeight(height, cameraFov[0], cameraFov[1]);
             const areaGroup = L.featureGroup([area]); // wrap single polygon in a group
             tilePolygonArea(areaGroup, tile.width, tile.height);
+
+            startBtn.disabled = false; // Enable start after area is finalized
+
+            // Reset period counter and UI when area is drawn
+            periodCounter = 0;
+            document.getElementById("period-current").textContent = "00:00";
         }
         drawStatus = 0;
         button.textContent = "Draw Area";
@@ -283,7 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("height-current").textContent = height;
 
     document.getElementById("period-total").textContent = period;
-    document.getElementById("period-current").textContent = Math.floor(periodCounter / (3600 * 1000));
+    document.getElementById("period-current").textContent = '00:00';
 });
 
 
@@ -300,12 +314,10 @@ document.getElementById("set-height-button").addEventListener("click", () => {
 let interval = null;
 let counterInterval = null;
 let periodCounter = 0
-const startBtn = document.getElementById("start-button");
-const stopBtn = document.getElementById("stop-button");
+
 startBtn.addEventListener("click", () => {
 
     console.log("Start sending data...");
-
     // Convert home point to meters
     const homeMeters = latlngToMeters({ lat: homePoint[0], lng: homePoint[1] });
 
@@ -321,6 +333,12 @@ startBtn.addEventListener("click", () => {
             });
         }
     });
+
+    // Prevent start if there are no tiles
+    if (centers.length === 0) {
+        alert("Please draw an area and generate tiles before starting navigation.");
+        return;
+    }
 
     // Home is always (0,0) in relative coordinates
     centers.push({ x: 0, y: 0 });
@@ -346,49 +364,68 @@ startBtn.addEventListener("click", () => {
     });
 
     interval = setInterval(() => {
-        const centers = [];
-        tileLayerGroup.eachLayer(layer => {
-            let center = layer.getBounds().getCenter();
-            let centerMeters = latlngToMeters(center);
-            centers.push({
-                x: centerMeters.x - homeMeters.x,
-                y: centerMeters.y - homeMeters.y
+        // Stop current navigation before starting a new one
+        fetch('/stop_navigation', { method: 'POST' })
+            .finally(() => {
+                // Reset period counter and UI
+                periodCounter = 0;
+                document.getElementById("period-current").textContent = "00:00";
+
+                // Collect tile centers again
+                const centers = [];
+                tileLayerGroup.eachLayer(layer => {
+                    if (layer instanceof L.Polygon && !(layer instanceof L.CircleMarker)) {
+                        let center = layer.getBounds().getCenter();
+                        let centerMeters = latlngToMeters(center);
+                        centers.push({
+                            x: centerMeters.x - homeMeters.x,
+                            y: centerMeters.y - homeMeters.y
+                        });
+                    }
+                });
+                centers.push({ x: 0, y: 0 });
+
+                const navData = {
+                    "home": { x: 0, y: 0 },
+                    "height": Number(height),
+                    "tiles": centers,
+                };
+
+                // Start new navigation
+                fetch('/navigation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(navData)
+                }).then(response => {
+                    if (!response.ok) {
+                        console.error('Failed to send navigation data');
+                    }
+                }).catch(error => {
+                    console.error('Error sending navigation data:', error);
+                });
+
+                startPollingStatus();
             });
-        });
-        centers.push({ x: 0, y: 0 });
 
-        const navData = {
-            "home": { x: 0, y: 0 },
-            "height": Number(height),
-            "tiles": centers,
-        };
-
-        // Send navData to '/navigation' endpoint
-        fetch('/navigation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(navData)
-        }).then(response => {
-            if (!response.ok) {
-                console.error('Failed to send navigation data');
-            }
-        }).catch(error => {
-            console.error('Error sending navigation data:', error);
-        });
-        
         console.log("Sent period navigation.");
-    }, 
-    period * 3600 * 1000);
+    }, period * 3600 * 1000);
 
     counterInterval = setInterval(() => {
-        document.getElementById("period-current").textContent = Math.floor(periodCounter / period);
+        const totalSeconds = periodCounter;
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        // Pad with leading zeros for two digits
+        const minStr = minutes.toString().padStart(2, '0');
+        const secStr = seconds.toString().padStart(2, '0');
+        document.getElementById("period-current").textContent = `${minStr}:${secStr}`;
         periodCounter++;
     }, 1000);
 
     startBtn.disabled = true;
     stopBtn.disabled = false;
+    button.disabled = true;
 
     // Polling for completion of navigation
     startPollingStatus()
@@ -402,6 +439,18 @@ stopBtn.addEventListener("click", () => {
     clearInterval(pollInterval); // Stop polling status
     startBtn.disabled = false;
     stopBtn.disabled = true;
+    button.disabled = false;
+
+    // Halt navigation on the backend
+    fetch('/stop_navigation', { method: 'POST' })
+        .then(response => {
+            if (!response.ok) {
+                console.error('Failed to stop navigation');
+            }
+        })
+        .catch(error => {
+            console.error('Error stopping navigation:', error);
+        });
 });
 
 

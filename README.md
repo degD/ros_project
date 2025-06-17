@@ -106,7 +106,7 @@ python ros_library.py
 - ✅ CONFIG dosyasını library vs. de okusun
 - ✅ Alan çizmede servis alanı sınırı
 - ✅ Kareleri ziyaret etmeyi harita olmasa da yap
-- Periot mantığını kontrol et
+- Periot mantığını kontrol et, start ve stop.
 - Arayüz iyileştirmesi
 
 ### 3. Harita geliştirmeleri

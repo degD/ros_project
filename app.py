@@ -6,6 +6,7 @@ import os
 import json
 import numpy as np
 import csv
+import signal
 
 def convert_numpy(obj):
     if isinstance(obj, dict):
@@ -34,7 +35,7 @@ def home():
     except FileNotFoundError:
         return "Configuration file not found.", 404
 
-
+proc = 0
 @app.route("/navigation", methods=["POST"])
 def navigation():
     print("Got data!")
@@ -47,7 +48,7 @@ def navigation():
     try:
         os.environ["LD_PRELOAD"] = "/usr/lib/x86_64-linux-gnu/libtiff.so.5"
         data_str = json.dumps(data)
-        subprocess.Popen(
+        proc = subprocess.Popen(
             ["python", "main.py", data_str]
         )
     except Exception as e:
@@ -91,6 +92,22 @@ def get_car_locations():
         return jsonify(car_locations)
     except FileNotFoundError:
         return jsonify([]) 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/stop_navigation', methods=['POST'])
+def stop_navigation():
+    try:
+        # Remove the completion file if it exists
+        if os.path.exists("complete.txt"):
+            os.remove("complete.txt")
+        # Stop the main.py process if running
+        if proc:
+            try:
+                os.kill(proc, signal.SIGTERM)
+            except ProcessLookupError:
+                pass  # Process already stopped
+        return jsonify({"status": "stopped"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
