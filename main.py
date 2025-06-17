@@ -9,7 +9,8 @@ import sys
 
 
 # Navigation data
-data = json.load(sys.stdin)
+data = json.loads(sys.argv[1])
+print(data, "from main.py")
 # Coordinate system of tile
 #        +y
 #        |

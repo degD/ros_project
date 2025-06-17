@@ -312,12 +312,14 @@ startBtn.addEventListener("click", () => {
     // Collect tile centers and convert to meters relative to home
     const centers = [];
     tileLayerGroup.eachLayer(layer => {
-        let center = layer.getBounds().getCenter();
-        let centerMeters = latlngToMeters(center);
-        centers.push({
-            x: centerMeters.x - homeMeters.x,
-            y: centerMeters.y - homeMeters.y
-        });
+        if (layer instanceof L.Polygon && !(layer instanceof L.CircleMarker)) {
+            let center = layer.getBounds().getCenter();
+            let centerMeters = latlngToMeters(center);
+            centers.push({
+                x: centerMeters.x - homeMeters.x,
+                y: centerMeters.y - homeMeters.y
+            });
+        }
     });
 
     // Home is always (0,0) in relative coordinates
