@@ -107,8 +107,8 @@ python ros_library.py
 - ✅ Alan çizmede servis alanı sınırı
 - ✅ Kareleri ziyaret etmeyi harita olmasa da yap
 - ✅ Periyot mantığını kontrol et, start ve stop.
-- Araç plaka okuma yalnız seçili alan içinde geçerli olsun. Dışındakileri okuma
-- Arayüz iyileştirmesi
+- ✅ Araç plaka okuma yalnız seçili alan içinde geçerli olsun. Dışındakileri okuma
+- Arayüz iyileştirmesi (help vs. ekle)
 
 ### 3. Harita geliştirmeleri
 - Artık WebUI daha iyi. Buna katkı için harita da geliştirilebilir
