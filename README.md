@@ -106,7 +106,8 @@ python ros_library.py
 - ✅ CONFIG dosyasını library vs. de okusun
 - ✅ Alan çizmede servis alanı sınırı
 - ✅ Kareleri ziyaret etmeyi harita olmasa da yap
-- Periot mantığını kontrol et, start ve stop.
+- ✅ Periyot mantığını kontrol et, start ve stop.
+- Araç plaka okuma yalnız seçili alan içinde geçerli olsun. Dışındakileri okuma
 - Arayüz iyileştirmesi
 
 ### 3. Harita geliştirmeleri
