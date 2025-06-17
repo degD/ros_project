@@ -1,7 +1,6 @@
 {
     "service_area_center": [41.02984173266594, 28.891425612148062],
     "service_area_radius": 100,
-    "home_point": [41.02984173266594, 28.891425612148062],
     "period": 60,
     "init_height": 80,
     "camera_fov": [60, 60]

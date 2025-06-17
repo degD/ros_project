@@ -8,13 +8,17 @@ import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
+import requests
+import mmrotate
+import json
 
 EPS = 0.5
 MAX_DIST = 5.0  # Maximum distance for each step
 INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
-
+URL_POS = "http://localhost:5000/update_drone_position"  
+PLATE = False   # as a result makes plate texts DISABLED and skips recognizing plates.
 
 def get_current_pose():
     """
@@ -36,6 +40,18 @@ def get_current_pose():
     if latest_pose["pose"] is None:
         rospy.logwarn("Could not get current pose.")
     return latest_pose["pose"]
+
+def send_position_to_flask():
+    pose = get_current_pose()
+    if pose is None:
+        return
+    pos = pose.position
+    url = URL_POS
+    data = {"x": pos.x, "y": pos.y, "z": pos.z}
+    try:
+        requests.post(url, json=data)
+    except Exception as e:
+        rospy.logerr(f"Failed to send position to Flask: {e}")
 
 def stepMove(target_point: Point):
     """
@@ -121,6 +137,7 @@ def simpleMove(point: Point):
 
     rospy.loginfo("Robot has arrived at the target point.")
     sub.unregister()
+    send_position_to_flask()
 
 
 def convertNavDataToWaypoints(navData):
@@ -359,7 +376,7 @@ def stepRotateDrone(degrees, stepsize=90):
 # Rotate around it, maybe with an altitude of 10m or less
 # Get photos of the front and back
 # Then read the plates
-def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
+def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10, index=-1):
     """
     Move the drone behind the car using car_x, car_y, and car_angle.
     A placeholder for reading the plate is returned.
@@ -378,13 +395,15 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10):
     stepRotateDrone(-1*deg_angle)
 
     # Try plate recognizing
-    takePhoto("plate", front=True)
-    plateText = plate.plateRecognizerDetect("images/plate.png")
-    # plateText = "FAILED"
+    if PLATE:
+        takePhoto("plate", front=True)
+        plateText = plate.plateRecognizerDetect("images/plate.png")
+    else:
+        plateText = "DISABLED"
 
     if save:
         with open("plates.txt", "a") as f:
-            f.write(f"{plateText.upper()}\n")
+            f.write(f"{index},{plateText.upper()}\n")
 
     # Reset rotation
     stepRotateDrone(deg_angle)
@@ -403,7 +422,8 @@ def readPlates(abs_coords):
             - "y_global": Y-coordinate of the detection.
             - "angle": Angle of the detection.
     """
-    while abs_coords:
+    indexed_abs_coords = [(i, detection) for i, detection in enumerate(abs_coords)]
+    while indexed_abs_coords:
         current_pose = get_current_pose()
         if current_pose is None:
             rospy.logerr("Current pose unavailable. Cannot determine closest coordinate.")
@@ -411,11 +431,11 @@ def readPlates(abs_coords):
 
         # Calculate distances and find the closest coordinate
         current_x, current_y = current_pose.position.x, current_pose.position.y
-        closest = min(
-            abs_coords,
+        i, closest = min(
+            indexed_abs_coords,
             key=lambda detection: math.sqrt(
-                (detection["x_global"] - current_x) ** 2 +
-                (detection["y_global"] - current_y) ** 2
+                (detection[1]["x_global"] - current_x) ** 2 +
+                (detection[1]["y_global"] - current_y) ** 2
             )
         )
 
@@ -425,11 +445,12 @@ def readPlates(abs_coords):
             closest["y_global"],
             closest["angle"],
             save=True,
-            behind = closest["w_global"] + 1.4
+            behind = closest["w_global"] + 1.4,
+            index=i
         )
 
         # Remove the processed coordinate from the list
-        abs_coords.remove(closest)
+        indexed_abs_coords.remove((i, closest))
 
 
 def resetPlates():

@@ -3,16 +3,24 @@ const configData = JSON.parse(document.body.dataset.token);
 const serviceAreaCenter = configData["service_area_center"];
 const serviceAreaRadius = configData["service_area_radius"];
 const cameraFov = configData["camera_fov"];
-const homePoint = configData["home_point"];
+const homePoint = configData["service_area_center"];
 let height = configData["init_height"];
 let period = configData["period"];
-
+const MAPTILER_KEY = document.body.dataset.maptileKey;
 
 var map = L.map('map').setView(configData["service_area_center"], 17);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+
+// Less detail, but much higher max zoom
+L.tileLayer(`https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, {
+    maxZoom: 22,
+    attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a>'
 }).addTo(map);
+
+// Better details, free OSM, but less max zoom
+// L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+//     maxZoom: 19,
+//     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+// }).addTo(map);
 
 
 const HEIGHT_MIN = 10;
@@ -28,6 +36,7 @@ function projectedAreaFromHeight(height, hfov, vfov) {
 }
 
 
+// Service area
 var circle = L.circle(serviceAreaCenter, {
     color: 'red',
     fillColor: '#f03',
@@ -35,12 +44,84 @@ var circle = L.circle(serviceAreaCenter, {
     radius: serviceAreaRadius
 }).addTo(map);
 
+// Service area center
+L.circleMarker(serviceAreaCenter, {
+    radius: 6,
+    color: 'red',
+    fillColor: '#f03',
+    fillOpacity: 1
+}).addTo(map);
+
+const dronePlusIcon = L.divIcon({
+    className: 'drone-plus-icon',
+    html: '<div style="font-size:22px; color:purple; font-weight:bold; line-height:18px;">+</div>',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11]
+});
+
+// Drone position relative to map
+let droneMarker = null;
+function updateDroneMarker() {
+    fetch('/get_drone_position')
+        .then(response => response.json())
+        .then(pos => {
+            const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
+            const droneMeters = {
+                x: centerMeters.x + pos.x,
+                y: centerMeters.y + pos.y
+            };
+            const latlng = metersToLatlng(droneMeters);
+
+            if (droneMarker) {
+                droneMarker.setLatLng(latlng);
+            } else {
+                droneMarker = L.marker(latlng, { icon: dronePlusIcon }).addTo(map);
+            }
+        });
+}
+setInterval(updateDroneMarker, 2000);
+droneMarker = L.marker(serviceAreaCenter, { icon: dronePlusIcon }).addTo(map);
+
+
+// Add drone altitude overlay
+const altitudeControl = L.control({position: 'bottomright'});
+
+altitudeControl.onAdd = function (map) {
+    const div = L.DomUtil.create('div', 'info altitude');
+    div.style.background = 'white';
+    div.style.padding = '8px';
+    div.style.borderRadius = '6px';
+    div.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+    div.innerHTML = `<b>Drone Altitude:</b> <span id="drone-altitude">-</span> m`;
+    return div;
+};
+
+altitudeControl.addTo(map);
+
+function updateDroneAltitude() {
+    fetch('/get_drone_position')
+        .then(response => response.json())
+        .then(pos => {
+            document.getElementById("drone-altitude").textContent =
+                (typeof pos.z === "number") ? pos.z.toFixed(2) : "-";
+        });
+}
+
+setInterval(updateDroneAltitude, 2000);
+updateDroneAltitude();
+
 
 let tileLayerGroup = L.layerGroup().addTo(map);
 let area = null;               // Final completed polygon
 let tempPreview = null;        // Temporary polygon while drawing
 let drawStatus = 0;            // 0 = not drawing, 1 = drawing
 let currentPoints = [];
+
+const startBtn = document.getElementById("start-button");
+const stopBtn = document.getElementById("stop-button");
+
+startBtn.disabled = true;
+stopBtn.disabled = true;
 
 const button = document.getElementById("draw-area-button");
 
@@ -60,6 +141,7 @@ button.addEventListener("click", () => {
 
         drawStatus = 1;
         button.textContent = "Complete";
+        startBtn.disabled = true; // Disable start while drawing
     } else {
         if (currentPoints.length >= 3) {
             if (tempPreview) {
@@ -68,9 +150,34 @@ button.addEventListener("click", () => {
             }
             area = L.polygon(currentPoints, { color: 'blue' }).addTo(map);
 
+            // Check if all points are inside the service area circle
+            const center = L.latLng(serviceAreaCenter[0], serviceAreaCenter[1]);
+            const radius = serviceAreaRadius;
+            const allInside = currentPoints.every(pt => {
+                const latlng = L.latLng(pt[0], pt[1]);
+                return center.distanceTo(latlng) <= radius;
+            });
+
+            if (!allInside) {
+                alert("Out of the service area!");
+                map.removeLayer(area);
+                area = null;
+                currentPoints = [];
+                drawStatus = 0;
+                button.textContent = "Draw Area";
+                startBtn.disabled = true; // Keep start disabled if invalid
+                return;
+            }
+
             const tile = projectedAreaFromHeight(height, cameraFov[0], cameraFov[1]);
             const areaGroup = L.featureGroup([area]); // wrap single polygon in a group
             tilePolygonArea(areaGroup, tile.width, tile.height);
+
+            startBtn.disabled = false; // Enable start after area is finalized
+
+            // Reset period counter and UI when area is drawn
+            periodCounter = 0;
+            document.getElementById("period-current").textContent = "00:00";
         }
         drawStatus = 0;
         button.textContent = "Draw Area";
@@ -163,6 +270,18 @@ function tilePolygonArea(polygonGroup, tileWidth, tileHeight) {
                 });
                 tileLayerGroup.addLayer(tile);
 
+                // Add a marker at the center of the tile
+                const centerX = (x + (x + tileWidth)) / 2;
+                const centerY = (y + (y + tileHeight)) / 2;
+                const centerLatLng = metersToLatlng({ x: centerX, y: centerY });
+                const centerMarker = L.circleMarker(centerLatLng, {
+                    radius: 1,
+                    color: 'green',
+                    fillColor: 'green',
+                    fillOpacity: 0.5
+                });
+                tileLayerGroup.addLayer(centerMarker);
+
                 tileCount++;
             }
         }
@@ -178,7 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("height-current").textContent = height;
 
     document.getElementById("period-total").textContent = period;
-    document.getElementById("period-current").textContent = Math.floor(periodCounter / (3600 * 1000));
+    document.getElementById("period-current").textContent = '00:00';
 });
 
 
@@ -195,25 +314,57 @@ document.getElementById("set-height-button").addEventListener("click", () => {
 let interval = null;
 let counterInterval = null;
 let periodCounter = 0
-const startBtn = document.getElementById("start-button");
-const stopBtn = document.getElementById("stop-button");
+
 startBtn.addEventListener("click", () => {
 
     console.log("Start sending data...");
+    // Convert home point to meters
+    const homeMeters = latlngToMeters({ lat: homePoint[0], lng: homePoint[1] });
 
-    // Initially send navData to '/navigation' endpoint
+    // Collect tile centers and convert to meters relative to home
     const centers = [];
     tileLayerGroup.eachLayer(layer => {
-        let center;
-        center = layer.getBounds().getCenter();
-        centers.push(latlngToMeters(center));
+        if (layer instanceof L.Polygon && !(layer instanceof L.CircleMarker)) {
+            let center = layer.getBounds().getCenter();
+            let centerMeters = latlngToMeters(center);
+            centers.push({
+                x: centerMeters.x - homeMeters.x,
+                y: centerMeters.y - homeMeters.y
+            });
+        }
     });
-    centers.push(latlngToMeters({ "lat": homePoint[0], "lng": homePoint[1] }));
+
+    // Prevent start if there are no tiles
+    if (centers.length === 0) {
+        alert("Please draw an area and generate tiles before starting navigation.");
+        return;
+    }
+
+    // Home is always (0,0) in relative coordinates
+    centers.push({ x: 0, y: 0 });
+
+    // Collect area polygon edges (vertices)
+    let areaEdges = [];
+    if (area) {
+        const latlngs = area.getLatLngs();
+        // latlngs is an array of arrays for polygons
+        const points = Array.isArray(latlngs[0]) ? latlngs[0] : latlngs;
+        areaEdges = points.map(pt => {
+            const ptMeters = latlngToMeters(pt);
+            return {
+                x: ptMeters.x - homeMeters.x,
+                y: ptMeters.y - homeMeters.y
+            };
+        });
+    }
+
     const navData = {
-        "home": latlngToMeters(homePoint),
+        "home": { x: 0, y: 0 },
         "height": Number(height),
         "tiles": centers,
+        "area_edges": areaEdges
     };
+
     fetch('/navigation', {
         method: 'POST',
         headers: {
@@ -229,45 +380,68 @@ startBtn.addEventListener("click", () => {
     });
 
     interval = setInterval(() => {
-        const centers = [];
-        tileLayerGroup.eachLayer(layer => {
-            let center;
-            center = layer.getBounds().getCenter();
-            centers.push(latlngToMeters(center));
-        });
-        centers.push(latlngToMeters({ "lat": homePoint[0], "lng": homePoint[1] }));
-        const navData = {
-            "home": latlngToMeters(homePoint),
-            "height": Number(height),
-            "tiles": centers,
-        };
+        // Stop current navigation before starting a new one
+        fetch('/stop_navigation', { method: 'POST' })
+            .finally(() => {
+                // Reset period counter and UI
+                periodCounter = 0;
+                document.getElementById("period-current").textContent = "00:00";
 
-        // Send navData to '/navigation' endpoint
-        fetch('/navigation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(navData)
-        }).then(response => {
-            if (!response.ok) {
-                console.error('Failed to send navigation data');
-            }
-        }).catch(error => {
-            console.error('Error sending navigation data:', error);
-        });
-        
+                // Collect tile centers again
+                const centers = [];
+                tileLayerGroup.eachLayer(layer => {
+                    if (layer instanceof L.Polygon && !(layer instanceof L.CircleMarker)) {
+                        let center = layer.getBounds().getCenter();
+                        let centerMeters = latlngToMeters(center);
+                        centers.push({
+                            x: centerMeters.x - homeMeters.x,
+                            y: centerMeters.y - homeMeters.y
+                        });
+                    }
+                });
+                centers.push({ x: 0, y: 0 });
+
+                const navData = {
+                    "home": { x: 0, y: 0 },
+                    "height": Number(height),
+                    "tiles": centers,
+                };
+
+                // Start new navigation
+                fetch('/navigation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(navData)
+                }).then(response => {
+                    if (!response.ok) {
+                        console.error('Failed to send navigation data');
+                    }
+                }).catch(error => {
+                    console.error('Error sending navigation data:', error);
+                });
+
+                startPollingStatus();
+            });
+
         console.log("Sent period navigation.");
-    }, 
-    period * 3600 * 1000);
+    }, period * 3600 * 1000);
 
     counterInterval = setInterval(() => {
-        document.getElementById("period-current").textContent = Math.floor(periodCounter / period);
+        const totalSeconds = periodCounter;
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        // Pad with leading zeros for two digits
+        const minStr = minutes.toString().padStart(2, '0');
+        const secStr = seconds.toString().padStart(2, '0');
+        document.getElementById("period-current").textContent = `${minStr}:${secStr}`;
         periodCounter++;
     }, 1000);
 
     startBtn.disabled = true;
     stopBtn.disabled = false;
+    button.disabled = true;
 
     // Polling for completion of navigation
     startPollingStatus()
@@ -281,6 +455,18 @@ stopBtn.addEventListener("click", () => {
     clearInterval(pollInterval); // Stop polling status
     startBtn.disabled = false;
     stopBtn.disabled = true;
+    button.disabled = false;
+
+    // Halt navigation on the backend
+    fetch('/stop_navigation', { method: 'POST' })
+        .then(response => {
+            if (!response.ok) {
+                console.error('Failed to stop navigation');
+            }
+        })
+        .catch(error => {
+            console.error('Error stopping navigation:', error);
+        });
 });
 
 
@@ -312,3 +498,117 @@ function startPollingStatus() {
             });
     }, 1000);
 }
+
+
+function drawCarRectangles() {
+    // Fetch both car locations and plates
+    Promise.all([
+        fetch('/get_car_locations').then(r => r.json()),
+        fetch('/get_car_plates').then(r => r.json())
+    ]).then(([carLocations, platesList]) => {
+        // Build a map from index to plate
+        const plateMap = new Map();
+        platesList.forEach(([idx, plate]) => {
+            plateMap.set(Number(idx), plate);
+        });
+
+        // Remove old rectangles if needed
+        if (window.carRectsGroup) {
+            map.removeLayer(window.carRectsGroup);
+        }
+        window.carRectsGroup = L.layerGroup().addTo(map);
+
+        carLocations.forEach((car, index) => {
+            // Rectangle center in meters (relative to service area center)
+            const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
+            const carCenter = {
+                x: centerMeters.x + car.x_global,
+                y: centerMeters.y + car.y_global
+            };
+
+            // Rectangle parameters
+            const w = car.h_global * 2;
+            const h = car.w_global * 2;
+            const angle = car.angle; // radians
+
+            // Compute rectangle corners (relative to center)
+            const dx = w / 2;
+            const dy = h / 2;
+
+            // Rotation matrix
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+
+            // Rectangle corners (clockwise)
+            const corners = [
+                {x: -dx, y: -dy},
+                {x: dx, y: -dy},
+                {x: dx, y: dy},
+                {x: -dx, y: dy}
+            ].map(corner => {
+                // Rotate and translate
+                const x_rot = corner.x * cosA - corner.y * sinA + carCenter.x;
+                const y_rot = corner.x * sinA + corner.y * cosA + carCenter.y;
+                return metersToLatlng({x: x_rot, y: y_rot});
+            });
+
+            // Determine color based on plate status
+            let color = "orange";
+            let plateText = "Not read yet";
+            if (plateMap.has(index)) {
+                const plate = plateMap.get(index);
+                if (plate === "FAILED") {
+                    color = "red";
+                    plateText = "Plate reading failed";
+                } else if (plate === "DISABLED") {
+                    color = "blue";
+                    plateText = "Plate reading disabled";
+                } else {
+                    color = "green";
+                    plateText = `Plate: ${plate}`;
+                }
+            }
+
+            // Draw rectangle
+            const rectangle = L.polygon(corners, {
+                color: color,
+                weight: 1,
+                fillOpacity: 0.2
+            }).addTo(window.carRectsGroup);
+
+            // Bind popup with plate information
+            rectangle.bindPopup(plateText);
+        });
+    });
+}
+setInterval(drawCarRectangles, 2000);
+drawCarRectangles();
+
+// Add car color legend overlay
+const legend = L.control({position: 'topright'});
+
+legend.onAdd = function (map) {
+    const div = L.DomUtil.create('div', 'info legend');
+    div.style.background = 'white';
+    div.style.padding = '8px';
+    div.style.borderRadius = '6px';
+    div.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+    div.innerHTML = `
+        <b>Legend</b><br>
+        <span style="display:inline-block;width:14px;height:14px;background:#f03;border-radius:50%;border:2px solid red;vertical-align:middle;margin-right:4px;"></span>
+        <span>Service Area (Radius: ${serviceAreaRadius} m)</span><br>
+        <span style="display:inline-block;width:18px;height:18px;vertical-align:middle;text-align:center;font-size:18px;color:purple;font-weight:bold;line-height:16px;">+</span>
+        <span>Drone</span><br>
+        <hr style="margin:6px 0;">
+        <b>Car Plate Status</b><br>
+        <i style="background: orange; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> Not read<br>
+        <i style="background: red; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> FAILED<br>
+        <i style="background: blue; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> DISABLED<br>
+        <i style="background: green; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> Success
+    `;
+    return div;
+};
+
+legend.addTo(map);
+
+

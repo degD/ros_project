@@ -4,5 +4,5 @@ output/*
 images/*
 plates.csv
 plates.txt
-*.pickle
 complete.txt
+coords.json

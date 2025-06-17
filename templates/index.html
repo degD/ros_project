@@ -16,12 +16,12 @@
     <script src="https://unpkg.com/leaflet-pip/leaflet-pip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 </head>
-<body data-token="{{ config_data }}">
+<body data-token="{{ config_data }}" data-maptile-key="{{ maptile_key }}">
     <div id="map"></div>
     <section>
         <label for="period-time">Period(min) <span id="period-current"></span>/<span id="period-total"></span></label>
-        <button id="start-button">Start</button>
-        <button id="stop-button">Stop</button>
+        <button id="start-button" disabled>Start</button>
+        <button id="stop-button" disabled>Stop</button>
     </section>
     <section>
         <label for="height-control">UAV height <span id="height-current"></span>:</label>
