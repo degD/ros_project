@@ -102,9 +102,9 @@ python ros_library.py
 - Ama costmap çalışmıyor
 
 ### 2. WebUI iyileştirmeleri
-- Harita üzerinde drone, tespit edilen araçlar, merkez, plakalar vs. gözüksün
+- ✅ Harita üzerinde drone, tespit edilen araçlar, merkez, plakalar vs. gözüksün
 - CONFIG dosyasını library vs. de okusun
-- Alan çizmede servis alanı sınırı
+- ✅ Alan çizmede servis alanı sınırı
 - Kareleri ziyaret etmeyi harita olmasa da yap
 - Periot mantığını kontrol et
 - Arayüz iyileştirmesi
