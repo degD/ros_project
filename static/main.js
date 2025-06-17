@@ -527,6 +527,12 @@ legend.onAdd = function (map) {
     div.style.borderRadius = '6px';
     div.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
     div.innerHTML = `
+        <b>Legend</b><br>
+        <span style="display:inline-block;width:14px;height:14px;background:#f03;border-radius:50%;border:2px solid red;vertical-align:middle;margin-right:4px;"></span>
+        <span>Service Area (Radius: ${serviceAreaRadius} m)</span><br>
+        <span style="display:inline-block;width:18px;height:18px;vertical-align:middle;text-align:center;font-size:18px;color:purple;font-weight:bold;line-height:16px;">+</span>
+        <span>Drone</span><br>
+        <hr style="margin:6px 0;">
         <b>Car Plate Status</b><br>
         <i style="background: orange; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> Not read<br>
         <i style="background: red; width: 12px; height: 12px; display: inline-block; border-radius:2px; margin-right:4px;"></i> FAILED<br>
@@ -537,3 +543,5 @@ legend.onAdd = function (map) {
 };
 
 legend.addTo(map);
+
+
