@@ -264,6 +264,18 @@ function tilePolygonArea(polygonGroup, tileWidth, tileHeight) {
                 });
                 tileLayerGroup.addLayer(tile);
 
+                // Add a marker at the center of the tile
+                const centerX = (x + (x + tileWidth)) / 2;
+                const centerY = (y + (y + tileHeight)) / 2;
+                const centerLatLng = metersToLatlng({ x: centerX, y: centerY });
+                const centerMarker = L.circleMarker(centerLatLng, {
+                    radius: 1,
+                    color: 'green',
+                    fillColor: 'green',
+                    fillOpacity: 0.5
+                });
+                tileLayerGroup.addLayer(centerMarker);
+
                 tileCount++;
             }
         }
@@ -302,19 +314,29 @@ startBtn.addEventListener("click", () => {
 
     console.log("Start sending data...");
 
-    // Initially send navData to '/navigation' endpoint
+    // Convert home point to meters
+    const homeMeters = latlngToMeters({ lat: homePoint[0], lng: homePoint[1] });
+
+    // Collect tile centers and convert to meters relative to home
     const centers = [];
     tileLayerGroup.eachLayer(layer => {
-        let center;
-        center = layer.getBounds().getCenter();
-        centers.push(latlngToMeters(center));
+        let center = layer.getBounds().getCenter();
+        let centerMeters = latlngToMeters(center);
+        centers.push({
+            x: centerMeters.x - homeMeters.x,
+            y: centerMeters.y - homeMeters.y
+        });
     });
-    centers.push(latlngToMeters({ "lat": homePoint[0], "lng": homePoint[1] }));
+
+    // Home is always (0,0) in relative coordinates
+    centers.push({ x: 0, y: 0 });
+
     const navData = {
-        "home": latlngToMeters(homePoint),
+        "home": { x: 0, y: 0 },
         "height": Number(height),
         "tiles": centers,
     };
+
     fetch('/navigation', {
         method: 'POST',
         headers: {
@@ -332,13 +354,17 @@ startBtn.addEventListener("click", () => {
     interval = setInterval(() => {
         const centers = [];
         tileLayerGroup.eachLayer(layer => {
-            let center;
-            center = layer.getBounds().getCenter();
-            centers.push(latlngToMeters(center));
+            let center = layer.getBounds().getCenter();
+            let centerMeters = latlngToMeters(center);
+            centers.push({
+                x: centerMeters.x - homeMeters.x,
+                y: centerMeters.y - homeMeters.y
+            });
         });
-        centers.push(latlngToMeters({ "lat": homePoint[0], "lng": homePoint[1] }));
+        centers.push({ x: 0, y: 0 });
+
         const navData = {
-            "home": latlngToMeters(homePoint),
+            "home": { x: 0, y: 0 },
             "height": Number(height),
             "tiles": centers,
         };
