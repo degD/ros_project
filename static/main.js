@@ -343,10 +343,26 @@ startBtn.addEventListener("click", () => {
     // Home is always (0,0) in relative coordinates
     centers.push({ x: 0, y: 0 });
 
+    // Collect area polygon edges (vertices)
+    let areaEdges = [];
+    if (area) {
+        const latlngs = area.getLatLngs();
+        // latlngs is an array of arrays for polygons
+        const points = Array.isArray(latlngs[0]) ? latlngs[0] : latlngs;
+        areaEdges = points.map(pt => {
+            const ptMeters = latlngToMeters(pt);
+            return {
+                x: ptMeters.x - homeMeters.x,
+                y: ptMeters.y - homeMeters.y
+            };
+        });
+    }
+
     const navData = {
         "home": { x: 0, y: 0 },
         "height": Number(height),
         "tiles": centers,
+        "area_edges": areaEdges
     };
 
     fetch('/navigation', {

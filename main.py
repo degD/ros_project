@@ -6,6 +6,7 @@ import json
 from geometry_msgs.msg import Point
 import numpy as np
 import sys
+import shapely.geometry
 
 
 # Navigation data
@@ -54,6 +55,19 @@ for f in os.listdir("images"):
     abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
     abs_coords = convert_numpy(abs_coords)  # Convert before saving
     all_abs_coords.extend(abs_coords)
+
+# Filter out detections outside the area polygon
+if "area_edges" in data and data["area_edges"]:
+    polygon = shapely.geometry.Polygon([(pt["x"], pt["y"]) for pt in data["area_edges"]])
+    filtered_coords = []
+    for car in all_abs_coords:
+        # Assume car has 'x' and 'y' keys for its center
+        if "x" in car and "y" in car:
+            if polygon.contains(shapely.geometry.Point(car["x"], car["y"])):
+                filtered_coords.append(car)
+        else:
+            filtered_coords.append(car)  # Keep if no position info
+    all_abs_coords = filtered_coords
 
 with open("coords.json", "w") as f:
     json.dump(all_abs_coords, f, indent=2)
