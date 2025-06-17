@@ -52,43 +52,35 @@ L.circleMarker(serviceAreaCenter, {
     fillOpacity: 1
 }).addTo(map);
 
+const dronePlusIcon = L.divIcon({
+    className: 'drone-plus-icon',
+    html: '<div style="font-size:22px; color:purple; font-weight:bold; line-height:18px;">+</div>',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11]
+});
+
 // Drone position relative to map
 let droneMarker = null;
 function updateDroneMarker() {
     fetch('/get_drone_position')
         .then(response => response.json())
         .then(pos => {
-            // 1. Project the service area center to meters
             const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
-            // 2. Add the relative x, y offsets
             const droneMeters = {
                 x: centerMeters.x + pos.x,
                 y: centerMeters.y + pos.y
             };
-            // 3. Convert back to lat/lng
             const latlng = metersToLatlng(droneMeters);
 
             if (droneMarker) {
                 droneMarker.setLatLng(latlng);
             } else {
-                droneMarker = L.circleMarker(latlng, {
-                    radius: 3,
-                    color: 'blue',
-                    fillColor: '#00f',
-                    fillOpacity: 0.8
-                }).addTo(map);
+                droneMarker = L.marker(latlng, { icon: dronePlusIcon }).addTo(map);
             }
         });
 }
 setInterval(updateDroneMarker, 2000);
-
-// Initialize drone marker at center
-droneMarker = L.circleMarker(serviceAreaCenter, {
-    radius: 3,
-    color: 'blue',
-    fillColor: '#00f',
-    fillOpacity: 0.8
-}).addTo(map);
+droneMarker = L.marker(serviceAreaCenter, { icon: dronePlusIcon }).addTo(map);
 
 
 // Add drone altitude overlay
