@@ -12,37 +12,19 @@ local_costmap:
 
   plugins:
     - { name: obstacle_layer,  type: "costmap_2d::ObstacleLayer" }
-    - { name: voxel_layer,     type: "costmap_2d::VoxelLayer" }
-    - { name: inflation_layer,  type: "costmap_2d::InflationLayer" }
-
-  voxel_layer:
-    observation_sources: octomap_sensor
-    octomap_sensor:
-      data_type: PointCloud2
-      topic: /firefly/octomap_point_cloud_centers
-      marking: true
-      clearing: true
-      min_obstacle_height: -999.0
-      max_obstacle_height: 999.0
-    publish_voxel_map: true
-    origin_z: -1.0
-    z_voxels: 32
-    z_resolution: 0.1
-
+    - { name: inflation_layer, type: "costmap_2d::InflationLayer" }
 
   obstacle_layer:
-    observation_sources: octomap_sensor
-    octomap_sensor:
+    observation_sources: vi_sensor_cloud
+    vi_sensor_cloud:
       data_type: PointCloud2
-      topic: /firefly/octomap_point_cloud_centers
+      topic: /filtered_octomap
       marking: true
       clearing: true
-      min_obstacle_height: -999.0
-      max_obstacle_height:  999.0
-
+      min_obstacle_height: -0.5         # adjust as needed based on drone's mounting
+      max_obstacle_height: 3.0          # avoid noise or ceiling hits
+      expected_update_rate: 2.0         # cells expire if not seen again in 2s
+      observation_persistence: 0.0      # do not retain stale points after expiration
 
   inflation_layer:
     inflation_radius: 1.0
-
-voxel_layer:
-  debug: true
