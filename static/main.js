@@ -340,9 +340,6 @@ startBtn.addEventListener("click", () => {
         return;
     }
 
-    // Home is always (0,0) in relative coordinates
-    centers.push({ x: 0, y: 0 });
-
     // Collect area polygon edges (vertices)
     let areaEdges = [];
     if (area) {
@@ -457,6 +454,12 @@ stopBtn.addEventListener("click", () => {
     stopBtn.disabled = true;
     button.disabled = false;
 
+    // Remove previously drawn car rectangles
+    if (window.carRectsGroup) {
+        map.removeLayer(window.carRectsGroup);
+        window.carRectsGroup = null;
+    }
+
     // Halt navigation on the backend
     fetch('/stop_navigation', { method: 'POST' })
         .then(response => {
@@ -501,6 +504,8 @@ function startPollingStatus() {
 
 
 function drawCarRectangles() {
+    const THRESH = 0.5; // Only draw cars with score > THRESH
+
     // Fetch both car locations and plates
     Promise.all([
         fetch('/get_car_locations').then(r => r.json()),
@@ -519,10 +524,13 @@ function drawCarRectangles() {
         window.carRectsGroup = L.layerGroup().addTo(map);
 
         carLocations.forEach((car, index) => {
+            // Only draw if score > THRESH
+            if (typeof car.score !== "number" || car.score <= THRESH) return;
+
             // Rectangle center in meters (relative to service area center)
             const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
             const carCenter = {
-                x: centerMeters.x + car.x_global,
+                x: centerMeters.x - car.x_global,
                 y: centerMeters.y + car.y_global
             };
 

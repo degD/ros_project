@@ -35,7 +35,6 @@ def home():
     except FileNotFoundError:
         return "Configuration file not found.", 404
 
-proc = 0
 @app.route("/navigation", methods=["POST"])
 def navigation():
     print("Got data!")
@@ -46,6 +45,7 @@ def navigation():
 
     # Call the separate ROS script with subprocess
     try:
+        global proc
         os.environ["LD_PRELOAD"] = "/usr/lib/x86_64-linux-gnu/libtiff.so.5"
         data_str = json.dumps(data)
         proc = subprocess.Popen(
@@ -86,9 +86,15 @@ def get_drone_position():
 @app.route('/get_car_locations')
 def get_car_locations():
     try:
-        with open("coords.json", "rb") as f:
+        with open("coords.json", "r") as f:
             car_locations = json.load(f)
         car_locations = convert_numpy(car_locations)
+        # Invert x_global for each car entry
+        for car in car_locations:
+            if isinstance(car, dict) and "x_global" in car:
+                car["x_global"] = -car["x_global"]
+                car["angle"] = -car["angle"]
+        
         return jsonify(car_locations)
     except FileNotFoundError:
         return jsonify([]) 

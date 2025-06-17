@@ -18,7 +18,7 @@ INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
-PLATE = False   # as a result makes plate texts DISABLED and skips recognizing plates.
+PLATE = True   # as a result makes plate texts DISABLED and skips recognizing plates.
 
 def get_current_pose():
     """

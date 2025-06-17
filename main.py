@@ -48,6 +48,9 @@ ros_library.MAX_DIST = 10.0
 points = [Point(tile["x"], tile["y"], data["height"]) for tile in data["tiles"]]
 ros_library.simpleNavigation(points, image=True)
 
+# Only before avoidance
+ros_library.simpleNavigation([Point(0, 0, 80)], [Point(0, 0, 10)])
+
 detect.init()
 all_abs_coords = []
 for f in os.listdir("images"):
@@ -68,6 +71,27 @@ if "area_edges" in data and data["area_edges"]:
         else:
             filtered_coords.append(car)  # Keep if no position info
     all_abs_coords = filtered_coords
+
+# Remove repetitions: keep only one car per 0.5m radius in (x_global, y_global)
+unique_coords = []
+for car in all_abs_coords:
+    x = car.get("x_global", car.get("x"))
+    y = car.get("y_global", car.get("y"))
+    if x is None or y is None:
+        unique_coords.append(car)
+        continue
+    too_close = False
+    for ucar in unique_coords:
+        ux = ucar.get("x_global", ucar.get("x"))
+        uy = ucar.get("y_global", ucar.get("y"))
+        if ux is not None and uy is not None:
+            dist = ((x - ux) ** 2 + (y - uy) ** 2) ** 0.5
+            if dist < 0.5:
+                too_close = True
+                break
+    if not too_close:
+        unique_coords.append(car)
+all_abs_coords = unique_coords
 
 with open("coords.json", "w") as f:
     json.dump(all_abs_coords, f, indent=2)
