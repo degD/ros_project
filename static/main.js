@@ -151,6 +151,24 @@ button.addEventListener("click", () => {
             }
             area = L.polygon(currentPoints, { color: 'blue' }).addTo(map);
 
+            // Check if all points are inside the service area circle
+            const center = L.latLng(serviceAreaCenter[0], serviceAreaCenter[1]);
+            const radius = serviceAreaRadius;
+            const allInside = currentPoints.every(pt => {
+                const latlng = L.latLng(pt[0], pt[1]);
+                return center.distanceTo(latlng) <= radius;
+            });
+
+            if (!allInside) {
+                alert("Out of the service area!");
+                map.removeLayer(area);
+                area = null;
+                currentPoints = [];
+                drawStatus = 0;
+                button.textContent = "Draw Area";
+                return;
+            }
+
             const tile = projectedAreaFromHeight(height, cameraFov[0], cameraFov[1]);
             const areaGroup = L.featureGroup([area]); // wrap single polygon in a group
             tilePolygonArea(areaGroup, tile.width, tile.height);
