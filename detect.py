@@ -19,7 +19,8 @@ def init():
     global FOV
 
     IMAGE_DIR = 'images/'
-    DEVICE = 'cpu'
+    DEVICE = 'cuda:0'
+    # DEVICE = 'cpu'    # Don't have CUDA GPU
     CONFIG_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90.py'
     CHECKPOINT_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90-6d2b2ce0.pth'
     MODEL = init_detector(CONFIG_FILE, CHECKPOINT_FILE, device=DEVICE)

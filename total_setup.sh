@@ -62,10 +62,18 @@ pip install fsspec
 mim install -y mmcv-full==1.7.2
 mim install -y mmdet==2.28.2
 pip install --force-reinstall -v "numpy==1.25.2"
-pip install mmrotate
+
+# Install mmrotate
+cd ~
+conda activate mmlab
+git clone https://github.com/open-mmlab/mmrotate.git
+cd mmrotate
+pip install -r requirements/build.txt
+pip install -v -e .
 
 # Clone and install project repository
 cd ~
+conda activate mmlab
 git clone git@github.com:degD/ros_project.git
 cd ~/ros_project
 mim download mmrotate --config oriented_rcnn_r50_fpn_1x_dota_le90 --dest .
@@ -73,9 +81,10 @@ echo 'export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtiff.so.5' >> ~/.bashrc
 source ~/.bashrc
 
 # Install Python requiriments
+conda activate mmlab
 pip install flask dotenv rospkg
 
-# Set .env values 
+# Set .env values (or find alternatives)
 MAPTILER="Write your token key here"
 PLATEREC="Write your token key here"
 cd ~/ros_project
