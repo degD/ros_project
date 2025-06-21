@@ -471,7 +471,7 @@ def resetPlates():
 if __name__ == "__main__":
 
     rospy.init_node("navigation_node", anonymous=True)
-    stepMove(Point(0, 0, 10))
+    simpleNavigation([Point(0, 0, 80)], image=True)
 
     # resetPlates()
     # resetPhotos()
