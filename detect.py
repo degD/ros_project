@@ -2,7 +2,6 @@ from typing import Tuple
 from mmdet.apis import init_detector, inference_detector
 import warnings
 from pathlib import Path
-import mmrotate
 from PIL import Image, ImageDraw
 from math import tan, radians
 import numpy as np
@@ -19,8 +18,7 @@ def init():
     global FOV
 
     IMAGE_DIR = 'images/'
-    DEVICE = 'cuda:0'
-    # DEVICE = 'cpu'    # Don't have CUDA GPU
+    DEVICE = 'cpu' 
     CONFIG_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90.py'
     CHECKPOINT_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90-6d2b2ce0.pth'
     MODEL = init_detector(CONFIG_FILE, CHECKPOINT_FILE, device=DEVICE)
@@ -203,6 +201,7 @@ def draw_detections_on_image(image_filename: str, output_path: str = None, score
     """Draw rotated boxes for detections and mark image center."""
     image_path = Path(IMAGE_DIR) / image_filename
     result = simple_inference(image_filename)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     img = Image.open(image_path).convert("RGB")
     draw = ImageDraw.Draw(img)
@@ -224,11 +223,11 @@ def draw_detections_on_image(image_filename: str, output_path: str = None, score
 
 if __name__ == "__main__":
     init()
-    IMAGE_DIR = ""
+    IMAGE_DIR = "images/"
     OUTPUT_DIR = "output/"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # inference_with_absolute_coordinates("0.11_-0.00_79.92.png")
+    inference_with_absolute_coordinates("0.11_-0.00_79.92.png")
 
     # List all image files in the IMAGE_DIR
     # image_files = [f for f in os.listdir(IMAGE_DIR) if f.endswith(".png")]
@@ -237,7 +236,7 @@ if __name__ == "__main__":
     for image_file in image_files:
         # Perform inference and draw detection boxes
         output_path = os.path.join(OUTPUT_DIR, f"detx_{image_file}")
-        draw_detections_on_image("image.png", "xxxx.jpg", score_threshold=0.3)
+        draw_detections_on_image("0.11_-0.00_79.90_scurve_bright.png", "output_path.png", score_threshold=0.3)
         print(f"Processed {image_file} -> {output_path}")
         # inference_with_absolute_coordinates(image_file)
     

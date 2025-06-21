@@ -1,3 +1,4 @@
+import numpy as np
 import detect
 import plate
 import rospy
@@ -13,7 +14,7 @@ import mmrotate
 import json
 
 EPS = 0.5
-MAX_DIST = 5.0  # Maximum distance for each step
+MAX_DIST = 2.0  # Maximum distance for each step
 INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
@@ -40,6 +41,37 @@ def get_current_pose():
     if latest_pose["pose"] is None:
         rospy.logwarn("Could not get current pose.")
     return latest_pose["pose"]
+def get_depth_image(timeout_sec=2.0):
+    """
+    Alır: Vi-Sensor'dan derinlik görüntüsünü alır.
+    Döner: Derinlik görüntüsünü (float32, metre cinsinden) bir NumPy array olarak döner.
+
+    Returns:
+        np.ndarray: Derinlik görüntüsü, float32 tipinde. Başarısız olursa None döner.
+    """
+    bridge = CvBridge()
+    depth_data = {"image": None}
+
+    def depth_callback(msg):
+        try:
+            depth_data["image"] = bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+        except Exception as e:
+            rospy.logerr(f"Depth image conversion failed: {e}")
+
+    sub = rospy.Subscriber('/firefly/vi_sensor/camera_depth/camera/image_raw', Image, depth_callback)
+    rate = rospy.Rate(10)
+    timeout = rospy.Time.now() + rospy.Duration(timeout_sec)
+
+    while not rospy.is_shutdown() and depth_data["image"] is None and rospy.Time.now() < timeout:
+        rate.sleep()
+
+    sub.unregister()
+
+    if depth_data["image"] is None:
+        rospy.logwarn("Derinlik görüntüsü alınamadı.")
+        return None
+
+    return depth_data["image"]
 
 def send_position_to_flask():
     pose = get_current_pose()
@@ -52,50 +84,222 @@ def send_position_to_flask():
         requests.post(url, json=data)
     except Exception as e:
         rospy.logerr(f"Failed to send position to Flask: {e}")
+import numpy as np
+
+def angle_between(v1, v2):
+    """İki vektör arasındaki açıyı radian cinsinden döner."""
+    v1_u = v1 / (np.linalg.norm(v1) + 1e-8)
+    v2_u = v2 / (np.linalg.norm(v2) + 1e-8)
+    dot = np.clip(np.dot(v1_u, v2_u), -1.0, 1.0)
+    return np.arccos(dot)
+
+def rotate_vector(vec, angle):
+    """2D vektörü saat yönünün tersine döndürür."""
+    R = np.array([[np.cos(angle), -np.sin(angle)],
+                  [np.sin(angle),  np.cos(angle)]])
+    return R @ vec
+
+def is_free_toward(pointcloud, direction_vector, threshold=1.5, cone_angle=np.radians(15)):
+    """
+    Belirli bir yöne doğru, konik alanda bir engel olup olmadığını kontrol eder.
+    """
+    for pt in pointcloud:
+        vec = np.array([pt[0], pt[1]])
+        dist = np.linalg.norm(vec)
+        if dist > threshold:
+            continue
+        angle = angle_between(vec, direction_vector)
+        if abs(angle) < cone_angle:
+            return False
+    return True
+
+def find_alternate_direction(pointcloud, original_dir, angle_offsets=np.radians([-45,-30,-15,15,30,45])):
+    """
+    Orijinal yön engelliyse, verilen sapma açılarıyla rotasyon deneyerek yeni güvenli yön arar.
+    """
+    for offset in angle_offsets:
+        new_dir = rotate_vector(original_dir, offset)
+        if is_free_toward(pointcloud, new_dir):
+            return new_dir
+    return None
+
+def extract_pointcloud_from_depth(depth_image, fx=554.25469, fy=554.25469, cx=320.5, cy=240.5, scale=1.0):
+    """
+    Derinlik görüntüsünden 2D düzlemde (x,y) koordinatları çıkarır.
+    """
+    h, w = depth_image.shape
+    points = []
+    for v in range(0, h, 10):  # daha seyrek örnekleme
+        for u in range(0, w, 10):
+            d = depth_image[v, u]
+            if np.isnan(d) or d <= 0:
+                continue
+            z = d * scale
+            x = (u - cx) * z / fx
+            y = (v - cy) * z / fy
+            points.append([x, y])
+    return points
+
+def adjust_goal_if_blocked(current_pos: Point, next_wp: Point, dist_limit=MAX_DIST) -> Point:
+    """
+    Derinlik verisine dayalı konik engel taraması ile hedef günceller.
+    """
+    depth_img = get_depth_image()
+    if depth_img is None:
+        rospy.logwarn("Derinlik verisi alınamadı. Orijinal hedef kullanılacak.")
+        return next_wp
+
+    pointcloud = extract_pointcloud_from_depth(depth_img)
+    
+    # Hedef yön vektörünü hesapla
+    dx = next_wp.x - current_pos.x
+    dy = next_wp.y - current_pos.y
+    vec = np.array([dx, dy])
+    dist = np.linalg.norm(vec)
+    direction = vec / (dist + 1e-6)
+    dist = min(dist, dist_limit)
+
+    if is_free_toward(pointcloud, direction):
+        return next_wp
+
+    rospy.loginfo("Hedef yönü engelli. Alternatif yön aranıyor...")
+    new_dir = find_alternate_direction(pointcloud, direction)
+    if new_dir is None:
+        rospy.logwarn("Hiçbir alternatif yön bulunamadı. Orijinal hedefe devam.")
+        return next_wp
+
+    # Yeni yön ile hedef oluştur
+    new_goal = Point()
+    new_goal.x = current_pos.x + new_dir[0] * dist
+    new_goal.y = current_pos.y + new_dir[1] * dist
+    new_goal.z = next_wp.z
+
+    rospy.loginfo(f"Yeni yön seçildi: ({new_goal.x:.2f}, {new_goal.y:.2f}, {new_goal.z:.2f})")
+    return new_goal
+def plan_path_with_avoidance(current_pos: Point, final_goal: Point, step_size=0.4, max_steps=50):
+    """
+    Orijinal hedefe küçük adımlarla yaklaşırken her adımda engel kontrolü yapar.
+    Engel varsa yön sapması yaparak engelden kaçınmaya çalışır.
+    Args:
+        current_pos: Başlangıç pozisyonu (Point).
+        final_goal: Nihai hedef pozisyonu (Point).
+        step_size: Her adımda gidilecek mesafe (metre).
+        max_steps: Maksimum adım sayısı (güvensiz durumda sonsuz döngüye girmemek için).
+    Returns:
+        List[Point]: Ara hedef listesi. Yol bulunamazsa None döner.
+    """
+    path = []
+    pos = Point()
+    pos.x, pos.y, pos.z = current_pos.x, current_pos.y, current_pos.z
+
+    for _ in range(max_steps):
+        dx = final_goal.x - pos.x
+        dy = final_goal.y - pos.y
+        dz = final_goal.z - pos.z
+        dist = np.linalg.norm([dx, dy])
+
+        if dist < step_size:
+            # Nihai hedefe ulaşıldı
+            path.append(final_goal)
+            rospy.loginfo("Nihai hedefe ulaşıldı.")
+            return path
+
+        # Bir sonraki ara hedefi hesapla
+        direction = np.array([dx, dy]) / (dist + 1e-6)
+        tentative_goal = Point()
+        tentative_goal.x = pos.x + direction[0] * step_size
+        tentative_goal.y = pos.y + direction[1] * step_size
+        tentative_goal.z = final_goal.z
+
+        # Engel varsa yeni yön bul
+        new_goal = adjust_goal_if_blocked(pos, tentative_goal, dist_limit=step_size)
+
+        if new_goal is None:
+            rospy.logwarn("Yol bulunamadı, kaçınma başarısız.")
+            return None
+
+        # Eğer yeni hedef, önerilenden çok farklı ise (engelden kaçma yapıldıysa)
+        if np.linalg.norm([new_goal.x - tentative_goal.x, new_goal.y - tentative_goal.y]) > 1e-3:
+            rospy.loginfo(f"Engel var, yeni ara hedef: ({new_goal.x:.2f}, {new_goal.y:.2f})")
+        
+        path.append(new_goal)
+        pos = new_goal
+
+    rospy.logwarn("Maksimum adım sayısına ulaşıldı, yol tamamlanamadı.")
+    return None
+
+
 
 def stepMove(target_point: Point):
     """
-    Moves the UAV to the target point in steps, each not exceeding MAX_DIST.
-    Args:
-        target_point (Point): The final destination point.
+    Engelden kaçınmalı adım-adım hedefe ilerleme.
+    Engel varsa küçük adımlar, yoksa maksimum dist'e kadar ilerlenir.
+    Ancak hedefe çok yaklaşınca aşırı ilerlemeyi önlemek için step_size sınırlanır.
     """
     current_pose = get_current_pose()
     if current_pose is None:
-        rospy.logerr("Current pose unavailable. Aborting stepMove.")
+        rospy.logerr("Pozisyon alınamadı. stepMove iptal.")
         return
 
-    start = current_pose.position
-    distance = math.sqrt(
-        (target_point.x - start.x) ** 2 +
-        (target_point.y - start.y) ** 2 +
-        (target_point.z - start.z) ** 2
-    )
-    rospy.loginfo(f"Starting stepMove: distance to target = {distance:.2f} m")
+    current_pos = current_pose.position
+    attempt = 0
+    max_attempts = 100
+    goal_reached_thresh = 0.3
 
-    steps = int(math.ceil(distance / MAX_DIST)) if distance > 0 else 1
-    rospy.loginfo(f"Splitting move into {steps} steps.")
+    while not rospy.is_shutdown() and attempt < max_attempts:
+        dx = target_point.x - current_pos.x
+        dy = target_point.y - current_pos.y
+        dz = target_point.z - current_pos.z
+        distance_to_goal = math.sqrt(dx**2 + dy**2 + dz**2)
 
-    for i in range(1, steps + 1):
-        dx = target_point.x - start.x
-        dy = target_point.y - start.y
-        dz = target_point.z - start.z
-        distance = math.sqrt(dx**2 + dy**2 + dz**2)
-        if distance < EPS:
+        if distance_to_goal < goal_reached_thresh:
+            rospy.loginfo("Hedefe ulaşıldı.")
             break
 
-        # Move a max of MAX_DIST or the remaining distance
-        step_size = min(MAX_DIST, distance)
-        ratio = step_size / distance
-        intermediate = Point(
-            start.x + dx * ratio,
-            start.y + dy * ratio,
-            start.z + dz * ratio
-        )
-        rospy.loginfo(f"Step {i}/{steps}: Moving to\n{intermediate}")
-        simpleMove(intermediate)
-        start = intermediate
+        direction = np.array([dx, dy]) / (distance_to_goal + 1e-6)
 
-    rospy.loginfo("Arrived at target using stepMove.")
+        # Derinlik al
+        depth_img = get_depth_image()
+        if depth_img is None:
+            rospy.logwarn("Derinlik alınamadı. Doğrudan ilerleniyor.")
+            move_dir = direction
+            step_size = min(MAX_DIST, distance_to_goal)
+        else:
+            pointcloud = extract_pointcloud_from_depth(depth_img)
+            if is_free_toward(pointcloud, direction):
+                # Engel yok → normal adım (ama max distance'ı aşmasın)
+                move_dir = direction
+                step_size = min(MAX_DIST, distance_to_goal)
+                rospy.loginfo("Engel yok. Normal adım.")
+            else:
+                rospy.loginfo("Engel var. Alternatif yön aranıyor...")
+                angle_offsets = np.radians(np.arange(-90, 91, 15))
+                move_dir = find_alternate_direction(pointcloud, direction, angle_offsets=angle_offsets)
+                if move_dir is None:
+                    rospy.logerr("Kaçınma başarısız. Hareket iptal.")
+                    return
+                step_size = min(MAX_DIST / 10.0, distance_to_goal)  # Küçük ve güvenli adım
+
+        # Yeni hedef noktayı oluştur
+        next_point = Point()
+        next_point.x = current_pos.x + move_dir[0] * step_size
+        next_point.y = current_pos.y + move_dir[1] * step_size
+        next_point.z = target_point.z
+
+        rospy.loginfo(f"[{attempt+1}] Ara hedef: ({next_point.x:.2f}, {next_point.y:.2f})")
+        simpleMove(next_point)
+
+        current_pose = get_current_pose()
+        if current_pose is None:
+            rospy.logerr("Pozisyon alınamadı. Hareket durduruldu.")
+            return
+        current_pos = current_pose.position
+        attempt += 1
+
+    if attempt >= max_attempts:
+        rospy.logwarn("Maksimum adım sayısı aşıldı. Hedefe ulaşılamadı.")
+
+
 
 
 def simpleMove(point: Point):
@@ -138,6 +342,41 @@ def simpleMove(point: Point):
     rospy.loginfo("Robot has arrived at the target point.")
     sub.unregister()
     send_position_to_flask()
+def is_direction_blocked(depth_image, angle_offset_deg=0, distance_threshold=200.0, width_pixels=10):
+    """
+    Belirli bir yönde engel olup olmadığını derinlik görüntüsüne göre kontrol eder.
+    depth_image: np.ndarray, genellikle uint8 (cm) ya da float32 (metre) tipinde olur.
+    """
+    import numpy as np
+    height, width = depth_image.shape
+    center_x = width // 2
+    FOV_DEG = 90.0
+    pixels_per_degree = width / FOV_DEG
+
+    target_x = int(center_x + angle_offset_deg * pixels_per_degree)
+    target_x = max(width_pixels // 2, min(width - width_pixels // 2 - 1, target_x))
+    start_x = target_x - width_pixels // 2
+    end_x = target_x + width_pixels // 2
+
+    vertical_region = depth_image[height//2:, start_x:end_x]
+
+    valid_depths = vertical_region[(vertical_region > 0) & (~np.isnan(vertical_region))]
+
+    if valid_depths.size == 0:
+        rospy.logwarn("Hiç geçerli derinlik verisi bulunamadı. Engel varsayılmadı.") 
+        return False
+
+    min_distance = valid_depths.min()
+
+    rospy.loginfo(f"Min derinlik değeri: {min_distance:.2f} (eşik: {distance_threshold})") 
+
+    if min_distance < distance_threshold:
+        rospy.loginfo("Engel tespit edildi.") 
+        return True
+    else:
+        rospy.loginfo("Engel yok, yol temiz.") 
+        return False
+
 
 
 def convertNavDataToWaypoints(navData):
@@ -162,24 +401,18 @@ def convertNavDataToWaypoints(navData):
 
 
 def simpleNavigation(waypoints: list, image=False):
-    """
-    Navigates through a list of waypoints one by one.
-
-    This function iterates over each waypoint, logging progress and then calling
-    the simpleMove function to move to the specified waypoint.
-
-    Args:
-        waypoints (list[Point]): A list of waypoints where each waypoint is an
-        instance of Point indicating the coordinates to navigate to.
-
-    Returns:
-        None
-    """
-
     wpNum = len(waypoints)
     for i, wp in enumerate(waypoints):
         rospy.loginfo(f"Moving to waypoint #{i}/{wpNum}...")
-        stepMove(wp)
+
+        current_pose = get_current_pose()
+        if current_pose is None:
+            rospy.logerr("Current pose alınamadı, hareket durduruldu.")
+            break
+
+        adjusted_wp = adjust_goal_if_blocked(current_pose.position, wp)
+        stepMove(adjusted_wp)
+
         if image:
             rospy.sleep(3)
             takePhoto()
@@ -469,9 +702,25 @@ def resetPlates():
 
 
 if __name__ == "__main__":
+    rospy.init_node("uav_navigation_test", anonymous=True)
 
-    rospy.init_node("navigation_node", anonymous=True)
-    simpleNavigation([Point(0, 0, 80)], image=True)
+    current_pose = get_current_pose()
+    if current_pose is None:
+        rospy.logerr("Başlangıç pozisyonu alınamadı.")
+        exit()
+
+    # Sabit hedef: x ekseninde 5 metre ilerisi
+    final_goal = Point(
+        current_pose.position.x + 5.0,
+        current_pose.position.y,
+        current_pose.position.z
+    )
+
+    rospy.loginfo(f"Test başlatılıyor. Hedef: ({final_goal.x:.2f}, {final_goal.y:.2f}, {final_goal.z:.2f})")
+
+    stepMove(final_goal)
+
+
 
     # resetPlates()
     # resetPhotos()
