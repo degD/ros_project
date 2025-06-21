@@ -232,73 +232,47 @@ def plan_path_with_avoidance(current_pos: Point, final_goal: Point, step_size=0.
 
 def stepMove(target_point: Point):
     """
-    Engelden kaçınmalı adım-adım hedefe ilerleme.
-    Engel varsa küçük adımlar, yoksa maksimum dist'e kadar ilerlenir.
-    Ancak hedefe çok yaklaşınca aşırı ilerlemeyi önlemek için step_size sınırlanır.
+    Moves the UAV to the target point in steps, each not exceeding MAX_DIST.
+    Args:
+        target_point (Point): The final destination point.
     """
     current_pose = get_current_pose()
     if current_pose is None:
-        rospy.logerr("Pozisyon alınamadı. stepMove iptal.")
+        rospy.logerr("Current pose unavailable. Aborting stepMove.")
         return
 
-    current_pos = current_pose.position
-    attempt = 0
-    max_attempts = 100
-    goal_reached_thresh = 0.3
+    start = current_pose.position
+    distance = math.sqrt(
+        (target_point.x - start.x) ** 2 +
+        (target_point.y - start.y) ** 2 +
+        (target_point.z - start.z) ** 2
+    )
+    rospy.loginfo(f"Starting stepMove: distance to target = {distance:.2f} m")
 
-    while not rospy.is_shutdown() and attempt < max_attempts:
-        dx = target_point.x - current_pos.x
-        dy = target_point.y - current_pos.y
-        dz = target_point.z - current_pos.z
-        distance_to_goal = math.sqrt(dx**2 + dy**2 + dz**2)
+    steps = int(math.ceil(distance / MAX_DIST)) if distance > 0 else 1
+    rospy.loginfo(f"Splitting move into {steps} steps.")
 
-        if distance_to_goal < goal_reached_thresh:
-            rospy.loginfo("Hedefe ulaşıldı.")
+    for i in range(1, steps + 1):
+        dx = target_point.x - start.x
+        dy = target_point.y - start.y
+        dz = target_point.z - start.z
+        distance = math.sqrt(dx**2 + dy**2 + dz**2)
+        if distance < EPS:
             break
 
-        direction = np.array([dx, dy]) / (distance_to_goal + 1e-6)
+        # Move a max of MAX_DIST or the remaining distance
+        step_size = min(MAX_DIST, distance)
+        ratio = step_size / distance
+        intermediate = Point(
+            start.x + dx * ratio,
+            start.y + dy * ratio,
+            start.z + dz * ratio
+        )
+        rospy.loginfo(f"Step {i}/{steps}: Moving to\n{intermediate}")
+        simpleMove(intermediate)
+        start = intermediate
 
-        # Derinlik al
-        depth_img = get_depth_image()
-        if depth_img is None:
-            rospy.logwarn("Derinlik alınamadı. Doğrudan ilerleniyor.")
-            move_dir = direction
-            step_size = min(MAX_DIST, distance_to_goal)
-        else:
-            pointcloud = extract_pointcloud_from_depth(depth_img)
-            if is_free_toward(pointcloud, direction):
-                # Engel yok → normal adım (ama max distance'ı aşmasın)
-                move_dir = direction
-                step_size = min(MAX_DIST, distance_to_goal)
-                rospy.loginfo("Engel yok. Normal adım.")
-            else:
-                rospy.loginfo("Engel var. Alternatif yön aranıyor...")
-                angle_offsets = np.radians(np.arange(-90, 91, 15))
-                move_dir = find_alternate_direction(pointcloud, direction, angle_offsets=angle_offsets)
-                if move_dir is None:
-                    rospy.logerr("Kaçınma başarısız. Hareket iptal.")
-                    return
-                step_size = min(MAX_DIST / 10.0, distance_to_goal)  # Küçük ve güvenli adım
-
-        # Yeni hedef noktayı oluştur
-        next_point = Point()
-        next_point.x = current_pos.x + move_dir[0] * step_size
-        next_point.y = current_pos.y + move_dir[1] * step_size
-        next_point.z = target_point.z
-
-        rospy.loginfo(f"[{attempt+1}] Ara hedef: ({next_point.x:.2f}, {next_point.y:.2f})")
-        simpleMove(next_point)
-
-        current_pose = get_current_pose()
-        if current_pose is None:
-            rospy.logerr("Pozisyon alınamadı. Hareket durduruldu.")
-            return
-        current_pos = current_pose.position
-        attempt += 1
-
-    if attempt >= max_attempts:
-        rospy.logwarn("Maksimum adım sayısı aşıldı. Hedefe ulaşılamadı.")
-
+    rospy.loginfo("Arrived at target using stepMove.")
 
 
 
@@ -416,6 +390,31 @@ def simpleNavigation(waypoints: list, image=False):
         if image:
             rospy.sleep(3)
             takePhoto()
+
+
+def avoid_obstacle_and_move(target_point: Point):
+    """
+    Belirtilen hedefe doğru giderken engellerden kaçınarak ilerler.
+    Her adımda çevre kontrol edilir ve gerekirse yön değiştirilir.
+    """
+    rospy.loginfo("Engelden kaçınmalı hareket başlatıldı...")
+    current_pose = get_current_pose()
+    if current_pose is None:
+        rospy.logerr("Mevcut konum alınamadı. İşlem iptal.")
+        return
+
+    path = plan_path_with_avoidance(current_pose.position, target_point)
+
+    if path is None:
+        rospy.logwarn("Engelden kaçınarak gidecek bir yol bulunamadı.")
+        return
+
+    rospy.loginfo(f"{len(path)} adımlı kaçınmalı yol bulundu. Hareket ediliyor...")
+    for point in path:
+        simpleMove(point)
+
+    rospy.loginfo("Hedefe başarıyla ulaşıldı.")
+
 
 
 # Subscribe to the topic '/firefly/image_raw' and save the RGB image into 'images' dir.
@@ -718,7 +717,8 @@ if __name__ == "__main__":
 
     rospy.loginfo(f"Test başlatılıyor. Hedef: ({final_goal.x:.2f}, {final_goal.y:.2f}, {final_goal.z:.2f})")
 
-    stepMove(final_goal)
+    avoid_obstacle_and_move(final_goal)
+
 
 
 

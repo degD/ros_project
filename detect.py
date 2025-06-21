@@ -18,7 +18,7 @@ def init():
     global FOV
 
     IMAGE_DIR = 'images/'
-    DEVICE = 'cpu' 
+    DEVICE = 'cpu'
     CONFIG_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90.py'
     CHECKPOINT_FILE = 'oriented_rcnn_r50_fpn_1x_dota_le90-6d2b2ce0.pth'
     MODEL = init_detector(CONFIG_FILE, CHECKPOINT_FILE, device=DEVICE)
@@ -201,7 +201,6 @@ def draw_detections_on_image(image_filename: str, output_path: str = None, score
     """Draw rotated boxes for detections and mark image center."""
     image_path = Path(IMAGE_DIR) / image_filename
     result = simple_inference(image_filename)
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     img = Image.open(image_path).convert("RGB")
     draw = ImageDraw.Draw(img)
