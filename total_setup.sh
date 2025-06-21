@@ -4,13 +4,16 @@
 # PART 1: ROS NOETIC AND ROTORS_SIMULATOR
 # ----------------------------------------------------------------------------------------------------------------------------
 
+# First thing first
+sudo apt install wget git
+
 # Install and setup ROS Noetic
 sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu `lsb_release -sc` main" > /etc/apt/sources.list.d/ros-latest.list'
 wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
 sudo apt-get update
-sudo apt-get install ros-noetic-desktop-full ros-noetic-joy ros-noetic-octomap-ros \
+sudo apt-get install -y ros-noetic-desktop-full ros-noetic-joy ros-noetic-octomap-ros \
     ros-noetic-mavlink python3-wstool python3-catkin-tools protobuf-compiler \
-    libgoogle-glog-dev ros-noetic-control-toolbox ros-noetic-mavros -y
+    libgoogle-glog-dev ros-noetic-control-toolbox ros-noetic-mavros
 echo 'source /opt/ros/noetic/setup.bash' >> ~/.bashrc
 source /opt/ros/noetic/setup.bash
 
