@@ -6,3 +6,4 @@ plates.csv
 plates.txt
 complete.txt
 coords.json
+__pycache__/*

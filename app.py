@@ -7,6 +7,9 @@ import json
 import numpy as np
 import csv
 import signal
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 def convert_numpy(obj):
     if isinstance(obj, dict):
@@ -19,6 +22,13 @@ def convert_numpy(obj):
         return obj
     
 
+# Remove completion status
+if os.path.exists("complete.txt"):
+    os.remove("complete.txt")
+
+# Remove process ID of previous main.py
+if os.path.exists("proc"):
+    os.remove("proc")
 
 load_dotenv()
 MAPTILER_KEY = os.getenv("MAPTILER_KEY")
@@ -35,6 +45,7 @@ def home():
     except FileNotFoundError:
         return "Configuration file not found.", 404
 
+
 @app.route("/navigation", methods=["POST"])
 def navigation():
     print("Got data!")
@@ -45,12 +56,14 @@ def navigation():
 
     # Call the separate ROS script with subprocess
     try:
-        global proc
         os.environ["LD_PRELOAD"] = "/usr/lib/x86_64-linux-gnu/libtiff.so.5"
         data_str = json.dumps(data)
         proc = subprocess.Popen(
             ["python", "main.py", data_str]
         )
+        print("PROC:", proc.pid)
+        with open("proc", "w") as f:
+            f.write(str(proc.pid))
     except Exception as e:
         print(f"Error launching ROS script: {e}")
     
@@ -108,6 +121,15 @@ def stop_navigation():
         if os.path.exists("complete.txt"):
             os.remove("complete.txt")
         # Stop the main.py process if running
+        proc = None
+        if os.path.exists("proc"):
+            with open("proc", "r") as f:
+                pid_str = f.read().strip()
+                if pid_str.isdigit():
+                    proc = int(pid_str)
+        # Remove the proc file after stopping the process
+        if os.path.exists("proc"):
+            os.remove("proc")
         if proc:
             try:
                 os.kill(proc, signal.SIGTERM)
