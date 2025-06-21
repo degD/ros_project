@@ -13,8 +13,9 @@ wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
 sudo apt-get update
 sudo apt-get install -y ros-noetic-desktop-full ros-noetic-joy ros-noetic-octomap-ros \
     ros-noetic-mavlink python3-wstool python3-catkin-tools protobuf-compiler \
-    libgoogle-glog-dev ros-noetic-control-toolbox ros-noetic-mavros
+    libgoogle-glog-dev ros-noetic-control-toolbox ros-noetic-mavros ros-noetic-octomap ros-noetic-octomap-mapping ros-noetic-move-base
 echo 'source /opt/ros/noetic/setup.bash' >> ~/.bashrc
+echo 'DISABLE_ROS1_EOL_WARNINGS=1' >> ~/.bashrc
 source /opt/ros/noetic/setup.bash
 
 # Create catkin workspace
@@ -82,7 +83,7 @@ source ~/.bashrc
 
 # Install Python requiriments
 conda activate mmlab
-pip install flask dotenv rospkg
+pip install flask dotenv rospkg defusedxml
 
 # Set .env values (or find alternatives)
 MAPTILER="Write your token key here"
