@@ -1,5 +1,5 @@
-# import detect
-# import plate
+import detect
+import plate
 import rospy
 from geometry_msgs.msg import Point, Pose, PoseStamped, PointStamped, Quaternion
 from sensor_msgs.msg import PointCloud2
@@ -16,7 +16,8 @@ import requests
 import numpy as np
 import tf2_ros
 import tf2_geometry_msgs
-# import mmrotate
+import mmrotate
+import navigation
 
 EPS = 0.5
 MAX_DIST = 1.0  # Maximum distance for each step
@@ -744,8 +745,8 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10, index=-1
     # behind_x = car_x
     # behind_y = car_y
     rospy.loginfo(f"Moving behind ({behind}) the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
-    stepMove(Point(behind_x, behind_y, altitude))
-    stepMove(Point(behind_x, behind_y, 0.7))
+    navigation.navigate(Point(behind_x, behind_y, altitude), avoid=True)
+    navigation.navigate(Point(behind_x, behind_y, 0.7))
     stepRotateDrone(-1*deg_angle)
 
     # Try plate recognizing
@@ -761,7 +762,7 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10, index=-1
 
     # Reset rotation
     stepRotateDrone(deg_angle)
-    stepMove(Point(behind_x, behind_y, altitude))
+    navigation.navigate(Point(behind_x, behind_y, altitude))
 
     return plateText
 

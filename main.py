@@ -7,6 +7,7 @@ from geometry_msgs.msg import Point
 import numpy as np
 import sys
 import shapely.geometry
+import navigation
 
 
 # Navigation data
@@ -18,8 +19,6 @@ print(data, "from main.py")
 # -x <-- 0 -- +x
 #        |
 #       -y
-
-
 
 def convert_numpy(obj):
     if isinstance(obj, dict):
@@ -42,10 +41,9 @@ ros_library.MAX_DIST = 10.0
 
 # Now visit and take photos of all the tiles
 points = [Point(tile["x"], tile["y"], data["height"]) for tile in data["tiles"]]
-ros_library.simpleNavigation(points, image=True)
-
-# Only before avoidance
-ros_library.simpleNavigation([Point(0, 0, 80), Point(0, 0, 10)], image=False)
+for pt in points:
+    navigation.navigate(pt, avoid=True)
+    ros_library.simpleNavigation([pt], image=True)
 
 detect.init()
 all_abs_coords = []
@@ -80,4 +78,4 @@ with open("complete.txt", "w") as f:
 
 # Return to home after reading all the plates, and wait until the next period
 # h = 10 for sim, make it land and stop later
-ros_library.simpleNavigation([Point(data["home"]["x"], data["home"]["y"], 10)])
+navigation.navigate(Point(data["home"]["x"], data["home"]["y"], 10))
