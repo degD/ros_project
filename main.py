@@ -54,15 +54,9 @@ detect.init()
 all_abs_coords = []
 for f in os.listdir("images"):
     detect.draw_detections_on_image(f, f"output/det_{f}")
-    abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
+    abs_coords = detect.inference_with_absolute_coordinates(f)
     abs_coords = convert_numpy(abs_coords)  # Convert before saving
     all_abs_coords.extend(abs_coords)
-    
-# Invert x_global for each car entry
-for car in all_abs_coords:
-    if isinstance(car, dict) and "x_global" in car:
-        car["x_global"] = -car["x_global"]
-        car["angle"] = -car["angle"]
 
 # Filter out detections outside the area polygon
 if "area_edges" in data and data["area_edges"]:
@@ -79,6 +73,8 @@ if "area_edges" in data and data["area_edges"]:
 
 with open("coords.json", "w") as f:
     json.dump(all_abs_coords, f, indent=2)
+    
+navigation.navigate(Point(0, 0, 10), avoid=True, communicate=True)
 
 ros_library.MAX_DIST = 3.0
 ros_library.readPlates(all_abs_coords)

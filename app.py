@@ -105,12 +105,6 @@ def get_car_locations():
     try:
         with open("coords.json", "r") as f:
             car_locations = json.load(f)
-        car_locations = convert_numpy(car_locations)
-        # Invert x_global for each car entry
-        for car in car_locations:
-            if isinstance(car, dict) and "x_global" in car:
-                car["x_global"] = -car["x_global"]
-                car["angle"] = -car["angle"]
         
         return jsonify(car_locations)
     except FileNotFoundError:

@@ -326,7 +326,16 @@ def navigate(target: Point, avoid=False, image=False, communicate=False):
         
         if avoid:
             open_point = first_open_point(step_point, FALLBACK_ANGLES, BOX_SIZE)
-            if open_point != step_point:
+            if open_point == None:
+                back_vector = np.array([ -STEP_DIST*2, 0, 0 ])  
+                R = tft.quaternion_matrix(current_quaternion)[:3, :3]
+                back_offset = R.dot(back_vector)
+                back_point = Point(
+                    step_point.x + back_offset[0],
+                    step_point.y + back_offset[1],
+                    step_point.z + Z_OFFSET*3
+                )
+            elif open_point != step_point:
                 step_point = open_point
                 back_vector = np.array([ -STEP_DIST/2, 0, 0 ])  
                 R = tft.quaternion_matrix(current_quaternion)[:3, :3]

@@ -747,7 +747,7 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10, index=-1
     rospy.loginfo(f"Moving behind ({behind}) the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
     navigation.navigate(Point(behind_x, behind_y, altitude), avoid=True, communicate=True)
     stepRotateDrone(-1*deg_angle, relative=False)
-    navigation.navigate(Point(behind_x, behind_y, 0.7), communicate=True)
+    navigation.navigate(Point(behind_x, behind_y, 0.5), communicate=True)
 
     # Try plate recognizing
     if PLATE:

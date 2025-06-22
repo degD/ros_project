@@ -11,7 +11,7 @@ def plateRecognizerDetect(image):
             response = requests.post(
                 'https://api.platerecognizer.com/v1/plate-reader/',
                 files=dict(upload=fp),
-                headers={'Authorization': os.getenv('PLATE')})
+                headers={'Authorization': f"Token {os.getenv('PLATE')}"})
 
             return response.json()["results"][0]["plate"]
     except:

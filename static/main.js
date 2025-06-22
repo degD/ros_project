@@ -553,6 +553,8 @@ function drawCarRectangles() {
 
             // Rectangle center in meters (relative to service area center)
             const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
+            car.x_global = -1 * car.x_global;
+            car.angle = -1 * car.angle;
             const carCenter = {
                 x: centerMeters.x - car.x_global,
                 y: centerMeters.y + car.y_global
