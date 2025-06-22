@@ -10,6 +10,7 @@ import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 import tf.transformations as tft
 import requests
 import numpy as np
@@ -80,12 +81,14 @@ def object_avoiding_navigation(target: Point):
         stepRotateDrone(math.degrees(angle_to_target), relative=False)
         
         # Updating step_point after obstacle detection
-        try:
-            rospy.loginfo(f"Step point: x:{step_point.x:2f}, y:{step_point.y:2f}, z:{step_point.z:2f}")
-            step_point = first_open_point(step_point, FALLBACK_ANGLES, BOX_SIZE)
-        except:
-            rospy.loginfo("Unable to continue.")
-            return
+        # try:
+        print("Here")
+        rospy.loginfo(f"Step point: x:{step_point.x:2f}, y:{step_point.y:2f}, z:{step_point.z:2f}")
+        step_point = first_open_point(step_point, FALLBACK_ANGLES, BOX_SIZE)
+        print("there")
+        # except:
+        #     rospy.logerr("Unable to continue.")
+        #     return
         
         # Move to next step
         simpleMove(step_point)
@@ -215,7 +218,16 @@ def point_at_angular_offset(position: Point,
     goal.z = position.z + distance * offset_dir[2]
     return goal
 
-def box_is_clear(target_pt: Point, box_size: float, pc_timeout: float = 1.0) -> bool:
+
+
+latest_point_cloud = None  # Global variable to store the latest point cloud
+
+def point_cloud_callback(msg):
+    """Callback to update the global point cloud variable."""
+    global latest_point_cloud
+    latest_point_cloud = msg
+
+def box_is_clear(target_pt: Point, box_size: float) -> bool:
     """
     Checks if the cubic area around target_pt is free from obstacles.
     The function transforms points from the camera frame into global frame using TF.
@@ -223,16 +235,14 @@ def box_is_clear(target_pt: Point, box_size: float, pc_timeout: float = 1.0) -> 
     Args:
         target_pt (Point): Center of the box (global coordinates).
         box_size (float): Side length of the box in meters.
-        pc_timeout (float): Timeout for receiving point cloud.
 
     Returns:
         bool: True if no obstacle intersects the box, False otherwise.
     """
-    # Get point cloud
-    try:
-        pc_msg = rospy.wait_for_message('/firefly/vi_sensor/camera_depth/depth/points', PointCloud2, timeout=pc_timeout)
-    except rospy.ROSException:
-        rospy.logwarn("Timeout while waiting for point cloud")
+    global latest_point_cloud
+
+    if latest_point_cloud is None:
+        rospy.logwarn("No point cloud data available.")
         return False
 
     # Get current drone pose
@@ -242,15 +252,16 @@ def box_is_clear(target_pt: Point, box_size: float, pc_timeout: float = 1.0) -> 
         return False
 
     global_frame = "world"
-    cloud_frame = pc_msg.header.frame_id
+    cloud_frame = latest_point_cloud.header.frame_id
 
     tf_buf = tf2_ros.Buffer()
     tf_listener = tf2_ros.TransformListener(tf_buf)
 
     try:
-        tf_buf.can_transform(global_frame, cloud_frame, rospy.Time(0), timeout=rospy.Duration(1.0))
-    except tf2_ros.LookupException:
-        rospy.logwarn("TF transform not available from %s to %s", cloud_frame, global_frame)
+        transform = tf_buf.lookup_transform(global_frame, cloud_frame, rospy.Time(0), rospy.Duration(1.0))
+        transformed_cloud = do_transform_cloud(latest_point_cloud, transform)
+    except Exception as e:
+        rospy.logwarn("TF transform error: %s", str(e))
         return False
 
     # Define bounding box limits
@@ -260,25 +271,21 @@ def box_is_clear(target_pt: Point, box_size: float, pc_timeout: float = 1.0) -> 
     min_z, max_z = target_pt.z - half, target_pt.z + half
 
     # Go through each point in the point cloud
-    for pt in pcl2.read_points(pc_msg, field_names=("x", "y", "z"), skip_nans=True):
-        raw_pt = PointStamped()
-        raw_pt.header.frame_id = cloud_frame
-        raw_pt.point.x = pt[0]
-        raw_pt.point.y = pt[1]
-        raw_pt.point.z = pt[2]
-
-        try:
-            trans_pt = tf_buf.transform(raw_pt, global_frame, timeout=rospy.Duration(0.1)).point
-        except (tf2_ros.LookupException, tf2_ros.ExtrapolationException):
-            continue  # skip this point if transform fails
-
-        # Check if point is within bounding box
-        if (min_x <= trans_pt.x <= max_x and
-            min_y <= trans_pt.y <= max_y and
-            min_z <= trans_pt.z <= max_z):
-            return False  # Obstacle found
+    points = pcl2.read_points(transformed_cloud, field_names=("x", "y", "z"), skip_nans=True)
+    for pt in points:
+        if (min_x <= pt[0] <= max_x and
+            min_y <= pt[1] <= max_y and
+            min_z <= pt[2] <= max_z):
+            return False
 
     return True  # No obstacle in the box
+
+
+
+latest_pose = {"pose": None}
+
+def pose_callback(msg):
+    latest_pose["pose"] = msg
 
 def get_current_pose():
     """
@@ -286,20 +293,17 @@ def get_current_pose():
     Returns:
         Pose: The current pose of the UAV.
     """
-    latest_pose = {"pose": None}
-    def pose_callback(msg):
-        latest_pose["pose"] = msg
-
-    sub = rospy.Subscriber('/firefly/ground_truth/pose', Pose, pose_callback)
     rate = rospy.Rate(10)
     timeout = rospy.Time.now() + rospy.Duration(2.0)  # 2 seconds timeout
 
     while not rospy.is_shutdown() and latest_pose["pose"] is None and rospy.Time.now() < timeout:
         rate.sleep()
-    sub.unregister()
     if latest_pose["pose"] is None:
         rospy.logwarn("Could not get current pose.")
     return latest_pose["pose"]
+
+
+
 
 def send_position_to_flask():
     pose = get_current_pose()
@@ -809,54 +813,8 @@ def resetPlates():
 if __name__ == "__main__":
 
     rospy.init_node("navigation_node", anonymous=True)
-    # rotateDrone(90)
-    # simpleMove(Point(0, 0, 3))
-    # print(box_is_clear(Point(9, 0, 1), 1, 1))
+    rospy.Subscriber('/firefly/ground_truth/pose', Pose, pose_callback)
+    rospy.Subscriber('/firefly/vi_sensor/camera_depth/depth/points', PointCloud2, point_cloud_callback)
     
-    # print(point_at_angular_offset(
-    #     Point(0, 0, 1), 
-    #     Quaternion(x=0.0, y=0.0, z=0.0, w=1.0),
-    #     2, {"up": 90, "left": 90}
-    # ))
-    
-    # fallback_angles = [
-    #     {'left': 30},                     # 30° left
-    #     {'right': 30},                    # 30° right
-    #     {'left': 45, 'up': 15},           # up-left diagonal
-    #     {'right': 45, 'up': 15},          # up-right diagonal
-    # ]
+    object_avoiding_navigation(Point(0, 0, 5))
 
-    # safe_point = first_open_point(Point(2, 0, 1), fallback_angles)
-    # simpleMove(safe_point)
-    
-    object_avoiding_navigation(Point(5, 0, 1))
-    
-    # stepRotateDrone(-180, relative=False)
-    # stepMove(Point(0, 0, 10))
-
-    # resetPlates()
-    # resetPhotos()
-    # MAX_DIST = 10.0
-    # simpleNavigation([Point(0, 0, 80)], image=True)
-    # simpleNavigation([Point(0, 0, 10)], image=False)
-    # MAX_DIST = 1.0
-    # # detect.init()
-
-    # for f in os.listdir("images"):
-    #     detect.draw_detections_on_image(f, f"output/det_{f}")
-    #     abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
-
-    # # for detection in abs_coords:
-    # #     readCarPlate(
-    # #         detection["x_global"], 
-    # #         detection["y_global"], 
-    # #         detection["angle"],
-    # #         save=True)
-
-    # # simpleNavigation([Point(-16, -4, 20)])
-    # # readCarPlate(-14.6, -1.74, 1.51, save=True)
-
-    # readPlates(abs_coords)
-
-# {'x_global': 24.170509596565196, 'y_global': 6.748032890355546, 'altitude': 79.8, 'angle': 0.5816325, 'score': 0.8759265, 'w_global': 1.9124779614028897, 'h_global': 0.8567711158815933}
-    # readCarPlate(24, 6.7, 0.581, save=False, behind=0, alt=5)
