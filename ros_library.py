@@ -25,10 +25,11 @@ INFERENCE_Z = 20
 VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
 PLATE = True   # as a result makes plate texts DISABLED and skips recognizing plates.
-BOX_SIZE = 0.7   # change if you need a larger safety margin
+BOX_SIZE = 1.2   # change if you need a larger safety margin
 ROTATION_THRESHOLD = 0.2
 PUB_RATE_HZ        = 15  
 TIMEOUT_SEC        = 10  
+VOXEL_SIZE  = 0.2
 
 FALLBACK_ANGLES = [
     {'left': 30},
@@ -220,65 +221,76 @@ def point_at_angular_offset(position: Point,
 
 
 
+transformed_cloud = None
 latest_point_cloud = None  # Global variable to store the latest point cloud
 
 def point_cloud_callback(msg):
-    """Callback to update the global point cloud variable."""
     global latest_point_cloud
     latest_point_cloud = msg
 
+def wait_for_pointcloud_and_transform(timeout=2.0):
+    """
+    Blocks until a usable transformed point cloud is available or timeout is reached.
+    """
+    global latest_point_cloud, transformed_cloud
+
+    start_time = rospy.Time.now().to_sec()
+
+    while rospy.Time.now().to_sec() - start_time < timeout:
+        rospy.sleep(0.05)
+
+        if latest_point_cloud is None:
+            continue
+
+        try:
+            stamp = latest_point_cloud.header.stamp
+            src_frame = latest_point_cloud.header.frame_id
+            target_frame = "world"
+
+            if not tf_buf.can_transform(target_frame, src_frame, stamp, rospy.Duration(0.2)):
+                continue
+
+            transform = tf_buf.lookup_transform(target_frame, src_frame, stamp, rospy.Duration(0.1))
+            transformed = do_transform_cloud(latest_point_cloud, transform)
+            points = np.array(list(pcl2.read_points(transformed, field_names=("x", "y", "z"), skip_nans=True)))
+
+            if points.size == 0:
+                continue
+
+            # Voxel filtering
+            voxel_indices = np.floor(points / VOXEL_SIZE).astype(np.int32)
+            _, unique_indices = np.unique(voxel_indices, axis=0, return_index=True)
+            filtered_points = points[unique_indices]
+
+            transformed_cloud = filtered_points
+            return True
+
+        except Exception as e:
+            rospy.logwarn_throttle(1.0, "TF or point cloud error: %s", str(e))
+
+    rospy.logwarn("Timeout: No valid pointcloud or transform after %.1f seconds", timeout)
+    transformed_cloud = None
+    return False
+
 def box_is_clear(target_pt: Point, box_size: float) -> bool:
-    """
-    Checks if the cubic area around target_pt is free from obstacles.
-    The function transforms points from the camera frame into global frame using TF.
+    global transformed_cloud
 
-    Args:
-        target_pt (Point): Center of the box (global coordinates).
-        box_size (float): Side length of the box in meters.
-
-    Returns:
-        bool: True if no obstacle intersects the box, False otherwise.
-    """
-    global latest_point_cloud
-
-    if latest_point_cloud is None:
-        rospy.logwarn("No point cloud data available.")
+    if not wait_for_pointcloud_and_transform(timeout=2.0):
+        rospy.logwarn("Skipping box check due to unavailable data.")
         return False
 
-    # Get current drone pose
-    pose = get_current_pose()
-    if pose is None:
-        rospy.logwarn("Drone pose unavailable")
-        return False
-
-    global_frame = "world"
-    cloud_frame = latest_point_cloud.header.frame_id
-
-    tf_buf = tf2_ros.Buffer()
-    tf_listener = tf2_ros.TransformListener(tf_buf)
-
-    try:
-        transform = tf_buf.lookup_transform(global_frame, cloud_frame, rospy.Time(0), rospy.Duration(1.0))
-        transformed_cloud = do_transform_cloud(latest_point_cloud, transform)
-    except Exception as e:
-        rospy.logwarn("TF transform error: %s", str(e))
-        return False
-
-    # Define bounding box limits
     half = box_size / 2.0
     min_x, max_x = target_pt.x - half, target_pt.x + half
     min_y, max_y = target_pt.y - half, target_pt.y + half
     min_z, max_z = target_pt.z - half, target_pt.z + half
 
-    # Go through each point in the point cloud
-    points = pcl2.read_points(transformed_cloud, field_names=("x", "y", "z"), skip_nans=True)
-    for pt in points:
-        if (min_x <= pt[0] <= max_x and
-            min_y <= pt[1] <= max_y and
-            min_z <= pt[2] <= max_z):
-            return False
+    points = transformed_cloud  # Already a NumPy array
 
-    return True  # No obstacle in the box
+    inside = ((min_x <= points[:, 0]) & (points[:, 0] <= max_x) &
+              (min_y <= points[:, 1]) & (points[:, 1] <= max_y) &
+              (min_z <= points[:, 2]) & (points[:, 2] <= max_z))
+
+    return not np.any(inside)
 
 
 
@@ -815,6 +827,8 @@ if __name__ == "__main__":
     rospy.init_node("navigation_node", anonymous=True)
     rospy.Subscriber('/firefly/ground_truth/pose', Pose, pose_callback)
     rospy.Subscriber('/firefly/vi_sensor/camera_depth/depth/points', PointCloud2, point_cloud_callback)
+    tf_buf = tf2_ros.Buffer(cache_time=rospy.Duration(10.0))
+    tf_listener = tf2_ros.TransformListener(tf_buf)
     
-    object_avoiding_navigation(Point(0, 0, 5))
+    object_avoiding_navigation(Point(-5, 0, 2))
 
