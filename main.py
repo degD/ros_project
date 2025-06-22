@@ -9,10 +9,9 @@ import sys
 import shapely.geometry
 import navigation
 
-
+    
 # Navigation data
 data = json.loads(sys.argv[1])
-print(data, "from main.py")
 # Coordinate system of tile
 #        +y
 #        |
@@ -34,6 +33,9 @@ def convert_numpy(obj):
 
 rospy.init_node("navigation_node", anonymous=True)
 
+# Publish drone location
+navigation.send_position_to_flask()
+
 ros_library.resetOutput()
 ros_library.resetPlates()
 ros_library.resetPhotos()
@@ -42,8 +44,7 @@ ros_library.MAX_DIST = 10.0
 # Now visit and take photos of all the tiles
 points = [Point(tile["x"], tile["y"], data["height"]) for tile in data["tiles"]]
 for pt in points:
-    navigation.navigate(pt, avoid=True)
-    ros_library.simpleNavigation([pt], image=True)
+    navigation.navigate(pt, avoid=True, image=True, communicate=True)
 
 detect.init()
 all_abs_coords = []
@@ -78,4 +79,4 @@ with open("complete.txt", "w") as f:
 
 # Return to home after reading all the plates, and wait until the next period
 # h = 10 for sim, make it land and stop later
-navigation.navigate(Point(data["home"]["x"], data["home"]["y"], 10))
+navigation.navigate(Point(data["home"]["x"], data["home"]["y"], 10), avoid=True, communicate=True)

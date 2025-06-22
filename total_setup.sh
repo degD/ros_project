@@ -58,6 +58,7 @@ source ~/.bashrc
 conda create -n mmlab python=3.9 -y
 conda activate mmlab
 conda install -y pytorch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 pytorch-cuda=11.8 -c pytorch -c nvidia
+conda install conda-forge::python-orocos-kdl
 pip install -U openmim
 pip install fsspec
 mim install -y mmcv-full==1.7.2
@@ -83,7 +84,7 @@ source ~/.bashrc
 
 # Install Python requiriments
 conda activate mmlab
-pip install flask dotenv rospkg defusedxml
+pip install flask dotenv rospkg defusedxml shapely
 
 # Set .env values (or find alternatives)
 MAPTILER="Write your token key here"

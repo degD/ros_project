@@ -816,12 +816,17 @@ def resetPlates():
     if os.path.exists(filename):
         try:
             os.remove(filename)
+            # Create an empty plates.txt file if it doesn't exist
+            with open("plates.txt", "w") as f:
+                print("Created")
+    
             rospy.loginfo(f"Deleted {filename}")
         except Exception as e:
             rospy.logerr(f"Failed to delete {filename}: {e}")
     else:
         rospy.loginfo(f"No plates.txt file to delete.")
-
+        with open("plates.txt", "w") as f:
+            print("Created")
 
 if __name__ == "__main__":
 

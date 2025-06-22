@@ -33,7 +33,7 @@ PUB_RATE_HZ        = 15
 TIMEOUT_SEC        = 10  
 VOXEL_SIZE  = 1.0
 Z_OFFSET    = 1.0
-
+URL_POS = "http://localhost:5000/update_drone_position"  
 
 FALLBACK_ANGLES = [
     {'up': 90},
@@ -272,7 +272,20 @@ def point_at_angular_offset(position: Point,
     return goal
 
 
-def navigate(target: Point, avoid=False, take_image=False):
+def send_position_to_flask():
+    pose = get_current_pose()
+    if pose is None:
+        return
+    pos = pose.position
+    url = URL_POS
+    data = {"x": pos.x, "y": pos.y, "z": pos.z}
+    try:
+        requests.post(url, json=data)
+    except Exception as e:
+        rospy.logerr(f"Failed to send position to Flask: {e}")
+
+
+def navigate(target: Point, avoid=False, image=False, communicate=False):
     
     pub = rospy.Publisher('/firefly/command/pose', PoseStamped, queue_size=10)
 
@@ -297,6 +310,7 @@ def navigate(target: Point, avoid=False, take_image=False):
         
         if distance < EPS:
             rospy.loginfo("Arrived at target.")
+            takePhoto()
             return     
 
         step_size = min(STEP_DIST, distance)
@@ -349,10 +363,57 @@ def navigate(target: Point, avoid=False, take_image=False):
         pose_stamped.pose.orientation = step_orientation
         pub.publish(pose_stamped)
         
+        if communicate:
+            send_position_to_flask()
+
+            
+def takePhoto(filename=None, front=False):
+    bridge = CvBridge()
+    latest_image = {"image": None}
+    latest_pose = get_current_pose()
+
+    if latest_pose is None:
+        rospy.logerr("Current pose unavailable. Cannot take photo.")
+        return
+
+    def image_callback(msg):
+        latest_image["image"] = bridge.imgmsg_to_cv2(msg, "bgr8")
+
+    if not front:
+        sub = rospy.Subscriber('/firefly/image_raw', Image, image_callback)
+        rate = rospy.Rate(10)
+        timeout = rospy.Time.now() + rospy.Duration(2.0)  # 2 seconds timeout
+    else:
+        sub = rospy.Subscriber('/firefly/vi_sensor/camera_depth/camera/image_raw', Image, image_callback)
+        rate = rospy.Rate(10)
+        timeout = rospy.Time.now() + rospy.Duration(2.0)  # 2 seconds timeout
+
+    while not rospy.is_shutdown() and latest_image["image"] is None and rospy.Time.now() < timeout:
+        rate.sleep()
+    sub.unregister()
+
+    if latest_image["image"] is None:
+        rospy.logwarn("Could not capture image.")
+        return
+    
+    # Enhance brightness and vibrancy
+    # latest_image = cv2.convertScaleAbs(latest_image["image"], alpha=1.2, beta=30)
+
+    # Save the image with the drone's position as the filename
+    position = latest_pose.position
+    if not filename:
+        filename = f"images/{position.x:.2f}_{position.y:.2f}_{position.z:.2f}.png"
+    else:
+        filename = f"images/{filename}.png"
+
+    os.makedirs("images", exist_ok=True)
+    cv2.imwrite(filename, latest_image["image"])
+    rospy.loginfo(f"Photo saved as {filename}")
+        
 
 rospy.init_node("navigation_node", anonymous=True)
 rospy.Subscriber('/firefly/ground_truth/pose', Pose, pose_callback)
 rospy.Subscriber('/firefly/vi_sensor/camera_depth/depth/points', PointCloud2, point_cloud_callback)
 tf_buf = tf2_ros.Buffer(cache_time=rospy.Duration(10.0))
 tf_listener = tf2_ros.TransformListener(tf_buf)
-navigate(Point(10, 0, 3), avoid=True)
+navigate(Point(-10, 0, 3), avoid=True)
