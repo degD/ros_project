@@ -27,7 +27,7 @@ VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
 PLATE = True   # as a result makes plate texts DISABLED and skips recognizing plates.
 BOX_SIZE = 2.0   # change if you need a larger safety margin
-ROTATION_THRESHOLD = 0.2
+ROTATION_THRESHOLD = math.radians(1) 
 PUB_RATE_HZ        = 15  
 TIMEOUT_SEC        = 10  
 VOXEL_SIZE  = 0.2
@@ -745,9 +745,9 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10, index=-1
     # behind_x = car_x
     # behind_y = car_y
     rospy.loginfo(f"Moving behind ({behind}) the car at ({behind_x}, {behind_y}) with angle {car_angle}.")
-    navigation.navigate(Point(behind_x, behind_y, altitude), avoid=True)
-    navigation.navigate(Point(behind_x, behind_y, 0.7))
-    stepRotateDrone(-1*deg_angle)
+    navigation.navigate(Point(behind_x, behind_y, altitude), avoid=True, communicate=True)
+    stepRotateDrone(-1*deg_angle, relative=False)
+    navigation.navigate(Point(behind_x, behind_y, 0.7), communicate=True)
 
     # Try plate recognizing
     if PLATE:
@@ -761,8 +761,8 @@ def readCarPlate(car_x, car_y, car_angle, save=False, behind=3, alt=10, index=-1
             f.write(f"{index},{plateText.upper()}\n")
 
     # Reset rotation
-    stepRotateDrone(deg_angle)
-    navigation.navigate(Point(behind_x, behind_y, altitude))
+    stepRotateDrone(0.0, relative=False)
+    navigation.navigate(Point(behind_x, behind_y, altitude), communicate=True)
 
     return plateText
 
@@ -827,6 +827,7 @@ def resetPlates():
         rospy.loginfo(f"No plates.txt file to delete.")
         with open("plates.txt", "w") as f:
             print("Created")
+            
 
 if __name__ == "__main__":
 

@@ -107,7 +107,7 @@ function updateDroneAltitude() {
         });
 }
 
-setInterval(updateDroneAltitude, 2000);
+setInterval(updateDroneAltitude, 500);
 updateDroneAltitude();
 
 

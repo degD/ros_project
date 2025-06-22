@@ -27,7 +27,7 @@ INFERENCE_Z = 20
 VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
 PLATE = True   # as a result makes plate texts DISABLED and skips recognizing plates.
-BOX_SIZE = (1.0, 1.0, 1.0)   # (up, left, forward)
+BOX_SIZE = (3.0, 3.0, 3.0)   # (up, left, forward)
 ROTATION_THRESHOLD = 0.2
 PUB_RATE_HZ        = 15  
 TIMEOUT_SEC        = 10  
@@ -36,6 +36,8 @@ Z_OFFSET    = 1.0
 URL_POS = "http://localhost:5000/update_drone_position"  
 
 FALLBACK_ANGLES = [
+    {'up': 30},
+    {'up': 60},
     {'up': 90},
 ]
 
@@ -326,7 +328,7 @@ def navigate(target: Point, avoid=False, image=False, communicate=False):
             open_point = first_open_point(step_point, FALLBACK_ANGLES, BOX_SIZE)
             if open_point != step_point:
                 step_point = open_point
-                back_vector = np.array([ -STEP_DIST/4, 0, 0 ])  
+                back_vector = np.array([ -STEP_DIST/2, 0, 0 ])  
                 R = tft.quaternion_matrix(current_quaternion)[:3, :3]
                 back_offset = R.dot(back_vector)
                 back_point = Point(
@@ -345,7 +347,42 @@ def navigate(target: Point, avoid=False, image=False, communicate=False):
             yaw_diff = (yaw_diff + math.pi) % (2 * math.pi) - math.pi
             max_yaw_change = math.radians(45)
             if abs(yaw_diff) > max_yaw_change:
+                # Limit the yaw change to max_yaw_change
                 angle_to_target = yaw + (max_yaw_change if yaw_diff > 0 else -max_yaw_change)
+                q = quaternion_from_euler(roll, pitch, angle_to_target)
+                step_orientation = Quaternion(
+                    x=q[0],
+                    y=q[1],
+                    z=q[2],
+                    w=q[3]
+                )
+                # Publish only rotation command
+                pose_stamped = PoseStamped()
+                pose_stamped.header.stamp = rospy.Time.now()
+                pose_stamped.header.frame_id = "world"
+                pose_stamped.pose.position = current_position  # Stay in place
+                pose_stamped.pose.orientation = step_orientation
+                pub.publish(pose_stamped)
+
+                # Wait until rotation completes (within ROTATION_THRESHOLD)
+                rate = rospy.Rate(10)
+                while not rospy.is_shutdown():
+                    current_pose = get_current_pose()
+                    if current_pose is None:
+                        break
+                    _, _, current_yaw = euler_from_quaternion((
+                        current_pose.orientation.x,
+                        current_pose.orientation.y,
+                        current_pose.orientation.z,
+                        current_pose.orientation.w
+                    ))
+                    yaw_error = angle_to_target - current_yaw
+                    yaw_error = (yaw_error + math.pi) % (2 * math.pi) - math.pi
+                    if abs(yaw_error) < ROTATION_THRESHOLD:
+                        break
+                    rate.sleep()
+                # After rotation, skip moving this loop iteration
+                continue
             yaw = angle_to_target
             q = quaternion_from_euler(roll, pitch, yaw)
             step_orientation = Quaternion(
@@ -410,11 +447,18 @@ def takePhoto(filename=None, front=False):
     os.makedirs("images", exist_ok=True)
     cv2.imwrite(filename, latest_image["image"])
     rospy.loginfo(f"Photo saved as {filename}")
+    
+def init():
+    global tf_buf
+    global tf_listener
+    rospy.Subscriber('/firefly/ground_truth/pose', Pose, pose_callback)
+    rospy.Subscriber('/firefly/vi_sensor/camera_depth/depth/points', PointCloud2, point_cloud_callback)
+    tf_buf = tf2_ros.Buffer(cache_time=rospy.Duration(10.0))
+    tf_listener = tf2_ros.TransformListener(tf_buf)
         
 
-rospy.init_node("navigation_node", anonymous=True)
-rospy.Subscriber('/firefly/ground_truth/pose', Pose, pose_callback)
-rospy.Subscriber('/firefly/vi_sensor/camera_depth/depth/points', PointCloud2, point_cloud_callback)
-tf_buf = tf2_ros.Buffer(cache_time=rospy.Duration(10.0))
-tf_listener = tf2_ros.TransformListener(tf_buf)
-navigate(Point(-10, 0, 3), avoid=True)
+if __name__ == "__main__":
+
+    rospy.init_node("navigation_node", anonymous=True)
+    init()
+    navigate(Point(10, -5, 10), avoid=True)
