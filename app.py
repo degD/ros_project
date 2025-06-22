@@ -132,8 +132,10 @@ def stop_navigation():
             os.remove("proc")
         if proc:
             try:
-                os.kill(proc, signal.SIGTERM)
+                os.kill(proc, signal.SIGKILL)
+                print("Killing")
             except ProcessLookupError:
+                print("Killed")
                 pass  # Process already stopped
         return jsonify({"status": "stopped"}), 200
     except Exception as e:

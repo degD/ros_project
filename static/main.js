@@ -470,6 +470,30 @@ stopBtn.addEventListener("click", () => {
         .catch(error => {
             console.error('Error stopping navigation:', error);
         });
+
+    // Remove all tiles from the map
+    tileLayerGroup.clearLayers();
+
+    // Stop the period timer and reset UI
+    clearInterval(interval);
+    clearInterval(counterInterval);
+    periodCounter = 0;
+    document.getElementById("period-current").textContent = "00:00";
+
+    if (area) {
+        map.removeLayer(area);
+        area = null;
+    }
+    if (tempPreview) {
+        map.removeLayer(tempPreview);
+        tempPreview = null;
+    }
+    currentPoints = [];
+
+    if (area) {
+        map.removeLayer(area);
+        area = null;
+    }
 });
 
 

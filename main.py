@@ -79,4 +79,4 @@ with open("complete.txt", "w") as f:
 
 # Return to home after reading all the plates, and wait until the next period
 # h = 10 for sim, make it land and stop later
-navigation.navigate(Point(data["home"]["x"], data["home"]["y"], 10), avoid=True, communicate=True)
+navigation.navigate(Point(data["home"]["x"], data["home"]["y"], 10), avoid=True, image=False, communicate=True)

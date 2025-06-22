@@ -310,7 +310,8 @@ def navigate(target: Point, avoid=False, image=False, communicate=False):
         
         if distance < EPS:
             rospy.loginfo("Arrived at target.")
-            takePhoto()
+            if image:
+                takePhoto()
             return     
 
         step_size = min(STEP_DIST, distance)
