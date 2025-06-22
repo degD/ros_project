@@ -24,11 +24,73 @@ INFERENCE_Z = 20
 VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
 PLATE = True   # as a result makes plate texts DISABLED and skips recognizing plates.
-BOX_SIZE = 1.0   # change if you need a larger safety margin
+BOX_SIZE = 0.7   # change if you need a larger safety margin
+ROTATION_THRESHOLD = 0.2
+PUB_RATE_HZ        = 15  
+TIMEOUT_SEC        = 10  
+
+FALLBACK_ANGLES = [
+    {'left': 30},
+    {'right': 30},
+    {'left': 45, 'up': 15},
+    {'right': 45, 'up': 15},
+    {'up': 45},
+    {'up': 90},
+]
 
 
 # Silence TF warnings
 os.environ['ROSCONSOLE_CONFIG_FILE'] = '/home/deneg/ros_project/rosconsole.config'
+
+
+def object_avoiding_navigation(target: Point):
+    
+    current_pose = get_current_pose()
+    if current_pose is None:
+        rospy.logerr("Current pose unavailable. Aborting navigation.")
+        return
+    current_position = current_pose.position
+
+    while True:
+        
+        dx = target.x - current_position.x
+        dy = target.y - current_position.y
+        dz = target.z - current_position.z
+        distance = math.sqrt(dx**2 + dy**2 + dz**2)
+        
+        if distance < EPS:
+            rospy.loginfo("Arrived at target.")
+            return     
+
+        step_size = min(MAX_DIST, distance)
+        ratio = step_size / distance
+        step_point = Point(
+            current_position.x + dx * ratio,
+            current_position.y + dy * ratio,
+            current_position.z + dz * ratio
+        )
+        
+        # Calculate angle to target point
+        dx = step_point.x - current_position.x
+        dy = step_point.y - current_position.y
+        angle_to_target = math.atan2(dy, dx)
+
+        # Rotate drone to face the target point
+        rospy.loginfo(f"Rotating drone to face target point at angle {math.degrees(angle_to_target):.2f} degrees.")
+        stepRotateDrone(math.degrees(angle_to_target), relative=False)
+        
+        # Updating step_point after obstacle detection
+        try:
+            rospy.loginfo(f"Step point: x:{step_point.x:2f}, y:{step_point.y:2f}, z:{step_point.z:2f}")
+            step_point = first_open_point(step_point, FALLBACK_ANGLES, BOX_SIZE)
+        except:
+            rospy.loginfo("Unable to continue.")
+            return
+        
+        # Move to next step
+        simpleMove(step_point)
+        current_position = step_point
+        rospy.loginfo("Reached step.")
 
 
 def first_open_point(target: Point,
@@ -68,12 +130,13 @@ def first_open_point(target: Point,
     # 4) Try each angular offset in order
     for offsets in angle_offsets_list:
         probe = point_at_angular_offset(pos, ori, distance, offsets)
+        rospy.loginfo(f"Trying point: x:{probe.x:2f}, y:{probe.y:2f}, z:{probe.z:2f}")
         if box_is_clear(probe, box_size):
             return probe  # first clear candidate wins
 
-    # 5) Nothing was clear — fall back to original target
-    rospy.logwarn("No open fallback found; using original target.")
-    return target
+    # 5) Nothing was clear — raise exception
+    rospy.logwarn("No open fallback found.")
+    raise Exception
 
 def point_at_angular_offset(position: Point,
                             orientation: Quaternion,
@@ -151,8 +214,6 @@ def point_at_angular_offset(position: Point,
     goal.y = position.y + distance * offset_dir[1]
     goal.z = position.z + distance * offset_dir[2]
     return goal
-
-
 
 def box_is_clear(target_pt: Point, box_size: float, pc_timeout: float = 1.0) -> bool:
     """
@@ -316,11 +377,14 @@ def simpleMove(point: Point, server=False):
     # Calculate angle to target point
     dx = point.x - current_position.x
     dy = point.y - current_position.y
-    angle_to_target = math.atan2(dy, dx)
-
-    # Rotate drone to face the target point
-    rospy.loginfo(f"Rotating drone to face target point at angle {math.degrees(angle_to_target):.2f} degrees.")
-    stepRotateDrone(math.degrees(angle_to_target), relative=False)
+    
+    if abs(dx) > EPS or abs(dy) > EPS:
+        # Rotate drone to face the target point
+        
+        angle_to_target = math.atan2(dy, dx)
+        print(current_position, angle_to_target)
+        rospy.loginfo(f"Rotating drone to face target point at angle {math.degrees(angle_to_target):.2f} degrees.")
+        stepRotateDrone(math.degrees(angle_to_target), relative=False)
     
     # Get current pose after rotation
     current_pose = get_current_pose()
@@ -527,84 +591,123 @@ def inferenceImages():
 
     return coords
 
+# ---- helpers -------------------------------------------------------------
+def norm_rad(angle):
+    """Normalize to (-π, π]."""
+    angle = angle % (2.0 * math.pi)
+    return angle - 2.0 * math.pi if angle > math.pi else angle
+
+def yaw_from_pose(pose):
+    q = (pose.orientation.x, pose.orientation.y,
+         pose.orientation.z, pose.orientation.w)
+    _, _, yaw = euler_from_quaternion(q)
+    return norm_rad(yaw)
+
+def build_pose(position, roll, pitch, yaw):
+    q = quaternion_from_euler(roll, pitch, yaw)
+    ps = PoseStamped()
+    ps.header.stamp = rospy.Time.now()
+    ps.header.frame_id = "world"
+    ps.pose.position = position
+    ps.pose.orientation = Quaternion(*q)
+    return ps
+
+# ---- core rotation -------------------------------------------------------
 def rotateDrone(degrees, relative=True):
     """
-    Rotates the drone in place by 'degrees' (relative to its current heading).
-    No persistence in future commands (once complete, orientation remains changed).
+    Rotate the drone by `degrees`.
+      • If relative=True  → turn *delta* degrees.
+      • If relative=False → face the *absolute* yaw (deg) in world frame.
     """
     pub = rospy.Publisher('/firefly/command/pose', PoseStamped, queue_size=10)
-    current_pose = get_current_pose()
-    if current_pose is None:
-        rospy.logerr("Current pose unavailable. Cannot rotate.")
+    rate = rospy.Rate(PUB_RATE_HZ)
+
+    start_pose = get_current_pose()
+    if start_pose is None:
+        rospy.logerr("Current pose unavailable — cannot rotate.")
         return
 
-    # Convert current orientation to Euler angles (roll, pitch, yaw)
-    q = (current_pose.orientation.x,
-         current_pose.orientation.y,
-         current_pose.orientation.z,
-         current_pose.orientation.w)
-    roll, pitch, yaw = euler_from_quaternion(q)
+    roll, pitch, current_yaw = euler_from_quaternion((
+        start_pose.orientation.x,
+        start_pose.orientation.y,
+        start_pose.orientation.z,
+        start_pose.orientation.w
+    ))
 
-    # Calculate new orientation
-    if relative:
-        new_yaw = yaw + math.radians(degrees)
-        new_q = quaternion_from_euler(roll, pitch, new_yaw)
-    else:
-        new_yaw = math.radians(degrees)
-        new_q = quaternion_from_euler(roll, pitch, new_yaw)
+    target_yaw = norm_rad(current_yaw + math.radians(degrees)) if relative \
+                 else norm_rad(math.radians(degrees))
 
-    if new_yaw >= math.radians(360):
-        new_yaw -= math.radians(360)
+    cmd_pose = build_pose(start_pose.position, roll, pitch, target_yaw)
 
-    # Build a PoseStamped with same position but updated orientation
-    pose_stamped = PoseStamped()
-    pose_stamped.header.stamp = rospy.Time.now()
-    pose_stamped.header.frame_id = "world"
-    pose_stamped.pose.position = current_pose.position
-    pose_stamped.pose.orientation.x = new_q[0]
-    pose_stamped.pose.orientation.y = new_q[1]
-    pose_stamped.pose.orientation.z = new_q[2]
-    pose_stamped.pose.orientation.w = new_q[3]
+    rospy.loginfo(f"Rotating to {'relative' if relative else 'absolute'} "
+                  f"{degrees:.1f}°  (target yaw {math.degrees(target_yaw):.1f}°)")
 
-    # Publish until the drone is close to the desired yaw
-    rate = rospy.Rate(10)
-    arrived = False
-    rospy.loginfo(f"Rotating by {degrees} degrees...")
-
-    while not rospy.is_shutdown() and not arrived:
-        pub.publish(pose_stamped)
-        updated_pose = get_current_pose()
-        if updated_pose:
-            uq = (updated_pose.orientation.x,
-                  updated_pose.orientation.y,
-                  updated_pose.orientation.z,
-                  updated_pose.orientation.w)
-            _, _, current_yaw = euler_from_quaternion(uq)
-            print(current_yaw, new_yaw)
-            if abs(current_yaw - new_yaw) < 0.05:  # Radians threshold
-                arrived = True
+    t0 = rospy.Time.now()
+    while not rospy.is_shutdown():
+        pub.publish(cmd_pose)                       # keep sending set-point
+        now_pose = get_current_pose()
+        if now_pose:
+            yaw_err = norm_rad(target_yaw - yaw_from_pose(now_pose))
+            if abs(yaw_err) <= ROTATION_THRESHOLD:
+                rospy.loginfo("Rotation arrived (|Δyaw| ≤ %.2f°)",
+                              math.degrees(ROTATION_THRESHOLD))
+                return
+        if (rospy.Time.now() - t0).to_sec() > TIMEOUT_SEC:
+            rospy.logwarn("Rotate timeout after %.1f s; continuing anyway", TIMEOUT_SEC)
+            return
         rate.sleep()
 
-    rospy.loginfo("Drone rotation complete.")
-
-
+# ---- stepped version -----------------------------------------------------
 def stepRotateDrone(degrees, stepsize=90, relative=True):
-    
-    if degrees < 0:
-        stepsize *= -1
-
-    if -90 <= degrees <= 90:
-        rotateDrone(degrees, relative)
+    """
+    Rotate in multiple segments (useful for large turns).
+      • `degrees`  : final desired rotation (deg).
+      • `stepsize` : magnitude of each incremental step (deg).
+      • `relative` : True → cumulative delta, False → absolute yaw goal.
+    """
+    # normalise target degrees for easier logic
+    if relative:
+        total = degrees
     else:
-        times_step = int(degrees // stepsize)
-        if relative:
-            angles = [stepsize]*times_step + [degrees - stepsize*times_step]
-        else:
-            angles = [stepsize * i for i in range(1, int(times_step) + 1)]
-            if abs(degrees) % abs(stepsize) != 0:
-                angles.append(degrees)
-        for x in angles:
-            rotateDrone(x, relative)
+        total = norm_rad(math.radians(degrees)) * 180.0 / math.pi  # back to deg
+        if total >  180: total -= 360
+        if total <= -180: total += 360
+
+    if relative:
+        if abs(total) < 1e-2:   # already here
+            rospy.loginfo("Step rotation skipped — negligible request.")
+            return
+
+    step_sign = 1 if total >= 0 else -1
+    step_deg  = step_sign * abs(stepsize)
+    segments  = []
+
+    if relative:
+        # e.g. 250° with 90° steps → 90,90,70
+        n_full = int(abs(total) // abs(stepsize))
+        segments = [step_deg] * n_full
+        remainder = total - step_deg * n_full
+        if abs(remainder) > 1e-2:
+            segments.append(remainder)
+    else:
+        # Absolute: generate intermediate absolute yaws
+        current_yaw_deg = math.degrees(yaw_from_pose(get_current_pose()))
+        target_deg = total
+        diff = target_deg - current_yaw_deg
+        diff = (diff + 180) % 360 - 180   # shortest-direction diff
+
+        n_full = int(abs(diff) // abs(stepsize))
+        for i in range(1, n_full + 1):
+            segments.append(current_yaw_deg + i * step_sign * abs(stepsize))
+        segments.append(target_deg)
+        # execute as absolute moves
+        for yaw_abs in segments:
+            rotateDrone(yaw_abs, relative=False)
+        return
+
+    # execute relative segments
+    for seg in segments:
+        rotateDrone(seg, relative=True)
 
 
 # Fly over the car (for example (10,-8))
@@ -708,7 +811,7 @@ if __name__ == "__main__":
     rospy.init_node("navigation_node", anonymous=True)
     # rotateDrone(90)
     # simpleMove(Point(0, 0, 3))
-    # print(box_is_clear(Point(-5, 0, 1), 1, 1))
+    # print(box_is_clear(Point(9, 0, 1), 1, 1))
     
     # print(point_at_angular_offset(
     #     Point(0, 0, 1), 
@@ -716,15 +819,20 @@ if __name__ == "__main__":
     #     2, {"up": 90, "left": 90}
     # ))
     
-    fallback_angles = [
-        {'left': 30},                     # 30° left
-        {'right': 30},                    # 30° right
-        {'left': 45, 'up': 15},           # up-left diagonal
-        {'right': 45, 'up': 15},          # up-right diagonal
-    ]
+    # fallback_angles = [
+    #     {'left': 30},                     # 30° left
+    #     {'right': 30},                    # 30° right
+    #     {'left': 45, 'up': 15},           # up-left diagonal
+    #     {'right': 45, 'up': 15},          # up-right diagonal
+    # ]
 
-    safe_point = first_open_point(Point(2, 0, 1), fallback_angles)
-    simpleMove(safe_point)
+    # safe_point = first_open_point(Point(2, 0, 1), fallback_angles)
+    # simpleMove(safe_point)
+    
+    object_avoiding_navigation(Point(5, 0, 1))
+    
+    # stepRotateDrone(-180, relative=False)
+    # stepMove(Point(0, 0, 10))
 
     # resetPlates()
     # resetPhotos()
