@@ -1,16 +1,21 @@
-import detect
-import plate
+# import detect
+# import plate
 import rospy
-from geometry_msgs.msg import Point, PointStamped, Pose, PoseStamped
+from geometry_msgs.msg import Point, Pose, PoseStamped, PointStamped
+from sensor_msgs.msg import PointCloud2
+import sensor_msgs.point_cloud2 as pcl2
 import math
 import os
 import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
+import tf.transformations as tft
 import requests
-import mmrotate
-import json
+import numpy as np
+import tf2_ros
+import tf2_geometry_msgs
+# import mmrotate
 
 EPS = 0.5
 MAX_DIST = 5.0  # Maximum distance for each step
@@ -19,6 +24,72 @@ INFERENCE_Z = 20
 VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
 PLATE = True   # as a result makes plate texts DISABLED and skips recognizing plates.
+
+
+def box_is_clear(target_pt: Point, box_size: float, pc_timeout: float = 1.0) -> bool:
+    """
+    Checks if the cubic area around target_pt is free from obstacles.
+    The function transforms points from the camera frame into global frame using TF.
+
+    Args:
+        target_pt (Point): Center of the box (global coordinates).
+        box_size (float): Side length of the box in meters.
+        pc_timeout (float): Timeout for receiving point cloud.
+
+    Returns:
+        bool: True if no obstacle intersects the box, False otherwise.
+    """
+    # Get point cloud
+    try:
+        pc_msg = rospy.wait_for_message('/firefly/vi_sensor/camera_depth/depth/points', PointCloud2, timeout=pc_timeout)
+    except rospy.ROSException:
+        rospy.logwarn("Timeout while waiting for point cloud")
+        return False
+
+    # Get current drone pose
+    pose = get_current_pose()
+    if pose is None:
+        rospy.logwarn("Drone pose unavailable")
+        return False
+
+    global_frame = "world"
+    cloud_frame = pc_msg.header.frame_id
+
+    tf_buf = tf2_ros.Buffer()
+    tf_listener = tf2_ros.TransformListener(tf_buf)
+
+    try:
+        tf_buf.can_transform(global_frame, cloud_frame, rospy.Time(0), timeout=rospy.Duration(1.0))
+    except tf2_ros.LookupException:
+        rospy.logwarn("TF transform not available from %s to %s", cloud_frame, global_frame)
+        return False
+
+    # Define bounding box limits
+    half = box_size / 2.0
+    min_x, max_x = target_pt.x - half, target_pt.x + half
+    min_y, max_y = target_pt.y - half, target_pt.y + half
+    min_z, max_z = target_pt.z - half, target_pt.z + half
+
+    # Go through each point in the point cloud
+    for pt in pcl2.read_points(pc_msg, field_names=("x", "y", "z"), skip_nans=True):
+        raw_pt = PointStamped()
+        raw_pt.header.frame_id = cloud_frame
+        raw_pt.point.x = pt[0]
+        raw_pt.point.y = pt[1]
+        raw_pt.point.z = pt[2]
+
+        try:
+            trans_pt = tf_buf.transform(raw_pt, global_frame, timeout=rospy.Duration(0.1)).point
+        except (tf2_ros.LookupException, tf2_ros.ExtrapolationException):
+            continue  # skip this point if transform fails
+
+        # Check if point is within bounding box
+        if (min_x <= trans_pt.x <= max_x and
+            min_y <= trans_pt.y <= max_y and
+            min_z <= trans_pt.z <= max_z):
+            return False  # Obstacle found
+
+    return True  # No obstacle in the box
 
 def get_current_pose():
     """
@@ -471,7 +542,10 @@ def resetPlates():
 if __name__ == "__main__":
 
     rospy.init_node("navigation_node", anonymous=True)
-    stepMove(Point(-1, 0, 10))
+    # rotateDrone(90)
+    # simpleMove(Point(0, 0, 3))
+    print(box_is_clear(Point(-5, 0, 1), 1, 1))
+    # simpleMove(Point(1, 0, 1))
 
     # resetPlates()
     # resetPhotos()
