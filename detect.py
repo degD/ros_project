@@ -155,7 +155,7 @@ def inference_with_absolute_coordinates(image_filename: str, remove_repetations=
             })
 
     if remove_repetations and abs_list:
-        threshold = 1.0
+        threshold = 0.2
         filtered = []
         for det in abs_list:
             too_close = False

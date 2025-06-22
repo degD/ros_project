@@ -66,6 +66,7 @@ function updateDroneMarker() {
         .then(response => response.json())
         .then(pos => {
             const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
+            pos.x = -1 * pos.x;
             const droneMeters = {
                 x: centerMeters.x + pos.x,
                 y: centerMeters.y + pos.y
@@ -107,7 +108,7 @@ function updateDroneAltitude() {
         });
 }
 
-setInterval(updateDroneAltitude, 2000);
+setInterval(updateDroneAltitude, 500);
 updateDroneAltitude();
 
 
@@ -470,6 +471,30 @@ stopBtn.addEventListener("click", () => {
         .catch(error => {
             console.error('Error stopping navigation:', error);
         });
+
+    // Remove all tiles from the map
+    tileLayerGroup.clearLayers();
+
+    // Stop the period timer and reset UI
+    clearInterval(interval);
+    clearInterval(counterInterval);
+    periodCounter = 0;
+    document.getElementById("period-current").textContent = "00:00";
+
+    if (area) {
+        map.removeLayer(area);
+        area = null;
+    }
+    if (tempPreview) {
+        map.removeLayer(tempPreview);
+        tempPreview = null;
+    }
+    currentPoints = [];
+
+    if (area) {
+        map.removeLayer(area);
+        area = null;
+    }
 });
 
 
@@ -529,6 +554,8 @@ function drawCarRectangles() {
 
             // Rectangle center in meters (relative to service area center)
             const centerMeters = latlngToMeters({lat: serviceAreaCenter[0], lng: serviceAreaCenter[1]});
+            car.x_global = -1 * car.x_global;
+            car.angle = -1 * car.angle;
             const carCenter = {
                 x: centerMeters.x - car.x_global,
                 y: centerMeters.y + car.y_global

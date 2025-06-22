@@ -51,7 +51,7 @@ detect.init()
 all_abs_coords = []
 for f in os.listdir("images"):
     detect.draw_detections_on_image(f, f"output/det_{f}")
-    abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
+    abs_coords = detect.inference_with_absolute_coordinates(f)
     abs_coords = convert_numpy(abs_coords)  # Convert before saving
     all_abs_coords.extend(abs_coords)
 

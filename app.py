@@ -29,6 +29,10 @@ if os.path.exists("complete.txt"):
 # Remove process ID of previous main.py
 if os.path.exists("proc"):
     os.remove("proc")
+    
+# Remove process ID of previous main.py
+if os.path.exists("coords.json"):
+    os.remove("coords.json")
 
 load_dotenv()
 MAPTILER_KEY = os.getenv("MAPTILER_KEY")
@@ -130,10 +134,14 @@ def stop_navigation():
         # Remove the proc file after stopping the process
         if os.path.exists("proc"):
             os.remove("proc")
+        if os.path.exists("coords.json"):
+            os.remove("coords.json")
         if proc:
             try:
-                os.kill(proc, signal.SIGTERM)
+                os.kill(proc, signal.SIGKILL)
+                print("Killing")
             except ProcessLookupError:
+                print("Killed")
                 pass  # Process already stopped
         return jsonify({"status": "stopped"}), 200
     except Exception as e:

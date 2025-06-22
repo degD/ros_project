@@ -14,7 +14,7 @@ import json
 
 EPS = 0.5
 MAX_DIST = 5.0  # Maximum distance for each step
-INFERENCE_THRESHOLD = 0.4
+INFERENCE_THRESHOLD = 0.5
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
