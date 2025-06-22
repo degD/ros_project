@@ -27,21 +27,151 @@ INFERENCE_Z = 20
 VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
 PLATE = True   # as a result makes plate texts DISABLED and skips recognizing plates.
-BOX_SIZE = 2.0   # change if you need a larger safety margin
+BOX_SIZE = (1.0, 1.0, 1.0)   # (up, left, forward)
 ROTATION_THRESHOLD = 0.2
 PUB_RATE_HZ        = 15  
 TIMEOUT_SEC        = 10  
-VOXEL_SIZE  = 0.2
+VOXEL_SIZE  = 1.0
+Z_OFFSET    = 1.0
+
 
 FALLBACK_ANGLES = [
-    {'left': 30},
-    {'right': 30},
-    {'left': 45, 'up': 15},
-    {'right': 45, 'up': 15},
-    {'up': 45},
     {'up': 90},
 ]
 
+
+def first_open_point(target: Point,
+                     angle_offsets_list: list,
+                     box_size: tuple = BOX_SIZE) -> Point:
+    """
+    Return `target` if it is free of obstacles; otherwise iterate through
+    angle offsets (relative to the drone) and return the first candidate
+    point that is clear.
+
+    Args:
+        target (Point): Desired waypoint in world frame.
+        angle_offsets_list (list[dict]): e.g. [{'left':30}, {'left':30, 'up':15}]
+        box_size (tuple): Dimensions of the box (x, y, z) in meters.
+
+    Returns:
+        Point: The chosen open point (target itself or the first fallback).
+               If none are clear, the original target is returned.
+    """
+    # 1) Quick check: is target already clear?
+    if box_is_clear(target, box_size):
+        return target
+
+    # 2) Get current drone pose (world frame)
+    pose = get_current_pose()
+    if pose is None:
+        rospy.logwarn("Drone pose unavailable; returning original target.")
+        return target
+
+    pos = pose.position
+    ori = pose.orientation
+
+    # 3) Distance from drone to target (used for all probes)
+    dx, dy, dz = target.x - pos.x, target.y - pos.y, target.z - pos.z
+    distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+    # 4) Try each angular offset in order
+    for offsets in angle_offsets_list:
+        probe = point_at_angular_offset(pos, ori, distance, offsets)
+        rospy.loginfo(f"Trying point: x:{probe.x:2f}, y:{probe.y:2f}, z:{probe.z:2f}")
+        if box_is_clear(probe, box_size):
+            return probe  # first clear candidate wins
+
+    # 5) Nothing was clear — raise exception
+    rospy.logwarn("No open fallback found.")
+    return None
+
+
+transformed_cloud = None
+latest_point_cloud = None  # Global variable to store the latest point cloud
+
+def point_cloud_callback(msg):
+    global latest_point_cloud
+    latest_point_cloud = msg
+
+def wait_for_pointcloud_and_filter_box(target_pt: Point, box_size: tuple, timeout=2.0):
+    """
+    Waits for a point cloud and filters points within a box around the target point.
+
+    Args:
+        target_pt (Point): Center of the box (global coordinates).
+        box_size (tuple): Dimensions of the box (x, y, z) in meters.
+        timeout (float): Timeout in seconds.
+
+    Returns:
+        bool: True if the box is clear, False otherwise.
+    """
+    global latest_point_cloud, transformed_cloud
+
+    start_time = rospy.Time.now().to_sec()
+    transformed_cloud = None
+
+    while rospy.Time.now().to_sec() - start_time < timeout:
+        if latest_point_cloud is None:
+            continue
+
+        try:
+            stamp = latest_point_cloud.header.stamp
+            src_frame = latest_point_cloud.header.frame_id
+            target_frame = "world"
+
+            if not tf_buf.can_transform(src_frame, target_frame, stamp, rospy.Duration(0.2)):
+                continue
+
+            # Transform box center from world to sensor frame (NOT the cloud to world)
+            stamped_target = PointStamped()
+            stamped_target.header.frame_id = target_frame
+            stamped_target.header.stamp = stamp
+            stamped_target.point = target_pt
+
+            target_in_sensor = tf_buf.transform(stamped_target, src_frame, rospy.Duration(0.1)).point
+
+            # Filter directly in the sensor frame (much faster)
+            half_x, half_y, half_z = box_size[0] / 2.0, box_size[1] / 2.0, box_size[2] / 2.0
+            min_x, max_x = target_in_sensor.x - half_x, target_in_sensor.x + half_x
+            min_y, max_y = target_in_sensor.y - half_y, target_in_sensor.y + half_y
+            min_z, max_z = target_in_sensor.z - half_z, target_in_sensor.z + half_z
+
+            filtered = []
+            for x, y, z in pcl2.read_points(latest_point_cloud, field_names=("x", "y", "z"), skip_nans=True):
+                if (min_x <= x <= max_x and
+                    min_y <= y <= max_y and
+                    min_z <= z <= max_z):
+                    filtered.append((x, y, z))
+
+            # Early return if we found something inside the box
+            if filtered:
+                transformed_cloud = np.array(filtered)
+                return True
+
+            transformed_cloud = np.array([])  # Empty result, box is clear
+            return True
+
+        except Exception as e:
+            rospy.logwarn_throttle(1.0, "TF error: %s", str(e))
+
+    rospy.logwarn("Timeout: No valid pointcloud or transform after %.1f seconds", timeout)
+    return False
+
+def box_is_clear(target_pt: Point, box_size: tuple) -> bool:
+    """
+    Checks if the box around the target point is clear of obstacles.
+
+    Args:
+        target_pt (Point): Center of the box (global coordinates).
+        box_size (tuple): Dimensions of the box (x, y, z) in meters.
+
+    Returns:
+        bool: True if the box is clear, False otherwise.
+    """
+    if not wait_for_pointcloud_and_filter_box(target_pt, box_size):
+        return False
+
+    return transformed_cloud.size == 0
 
 latest_pose = {"pose": None}
 
@@ -62,6 +192,84 @@ def get_current_pose():
     if latest_pose["pose"] is None:
         rospy.logwarn("Could not get current pose.")
     return latest_pose["pose"]
+
+
+def point_at_angular_offset(position: Point,
+                            orientation: Quaternion,
+                            distance: float,
+                            angle_offsets: dict) -> Point:
+    """
+    Return a point lying `distance` metres from `position` in the direction
+    obtained by applying the given angular offsets to the drone's forward axis.
+
+    Args:
+        position (Point):    Drone position in world frame.
+        orientation (Quaternion): Drone orientation (x,y,z,w).
+        distance (float):    Radius of the sphere (metres).
+        angle_offsets (dict): e.g. {'left':30, 'up':15}.  Keys may be:
+                              'left', 'right', 'up', 'down'.
+                              Values are degrees (positive).
+
+    Returns:
+        Point: Target location in world frame.
+
+    Notes:
+        • At most one yaw key ('left' or 'right') and one pitch key
+          ('up' or 'down') will be honoured; extras are ignored.
+        • Drone is assumed level (roll = 0), matching your requirement.
+    """
+    # Basis axes in body frame ---------------------------------------------
+    fwd_body   = (1.0, 0.0, 0.0)     # +X
+    up_body    = (0.0, 0.0, 1.0)     # +Z
+    right_body = (0.0, -1.0, 0.0)    # +Y (right is -Y)
+
+    # World-frame rotation matrix from quaternion --------------------------
+    R = tft.quaternion_matrix([orientation.x,
+                               orientation.y,
+                               orientation.z,
+                               orientation.w])[:3, :3]
+
+    # Helper to build axis-angle rotation matrices -------------------------
+    def rot_from(key: str, deg: float):
+        rad = math.radians(deg)
+        if key == 'left':
+            axis = R.dot(up_body)    # yaw about up (+Z)  left = +rad
+            return tft.rotation_matrix(+rad, axis)[:3, :3]
+        if key == 'right':
+            axis = R.dot(up_body)
+            return tft.rotation_matrix(-rad, axis)[:3, :3]
+        if key == 'up':
+            axis = R.dot(right_body) # pitch about right axis  up = +rad
+            return tft.rotation_matrix(+rad, axis)[:3, :3]
+        if key == 'down':
+            axis = R.dot(right_body)
+            return tft.rotation_matrix(-rad, axis)[:3, :3]
+        raise ValueError(f"Invalid key '{key}'")
+
+    # Build composite rotation --------------------------------------------
+    R_total = tft.identity_matrix()[:3, :3]
+
+    # Apply yaw first, then pitch (fixed, intuitive order)
+    for key in ('left', 'right'):
+        if key in angle_offsets:
+            R_total = rot_from(key, angle_offsets[key]).dot(R_total)
+            break  # only one yaw key allowed
+
+    for key in ('up', 'down'):
+        if key in angle_offsets:
+            R_total = rot_from(key, angle_offsets[key]).dot(R_total)
+            break  # only one pitch key allowed
+
+    # Rotate drone's forward vector ----------------------------------------
+    fwd_world = R.dot(fwd_body)
+    offset_dir = R_total.dot(fwd_world)
+
+    # Scale & translate ----------------------------------------------------
+    goal = Point()
+    goal.x = position.x + distance * offset_dir[0]
+    goal.y = position.y + distance * offset_dir[1]
+    goal.z = position.z + distance * offset_dir[2]
+    return goal
 
 
 def navigate(target: Point, avoid=False, take_image=False):
@@ -99,6 +307,20 @@ def navigate(target: Point, avoid=False, take_image=False):
             current_position.z + dz * ratio
         )
         
+        if avoid:
+            open_point = first_open_point(step_point, FALLBACK_ANGLES, BOX_SIZE)
+            if open_point != step_point:
+                step_point = open_point
+                back_vector = np.array([ -STEP_DIST/4, 0, 0 ])  
+                R = tft.quaternion_matrix(current_quaternion)[:3, :3]
+                back_offset = R.dot(back_vector)
+                back_point = Point(
+                    step_point.x + back_offset[0],
+                    step_point.y + back_offset[1],
+                    step_point.z + Z_OFFSET
+                )
+                step_point = back_point
+
         dx = step_point.x - current_position.x
         dy = step_point.y - current_position.y
         if abs(dx) > EPS or abs(dy) > EPS:            
@@ -130,4 +352,7 @@ def navigate(target: Point, avoid=False, take_image=False):
 
 rospy.init_node("navigation_node", anonymous=True)
 rospy.Subscriber('/firefly/ground_truth/pose', Pose, pose_callback)
-navigate(Point(0, -5, 2))
+rospy.Subscriber('/firefly/vi_sensor/camera_depth/depth/points', PointCloud2, point_cloud_callback)
+tf_buf = tf2_ros.Buffer(cache_time=rospy.Duration(10.0))
+tf_listener = tf2_ros.TransformListener(tf_buf)
+navigate(Point(10, 0, 3), avoid=True)
