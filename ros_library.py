@@ -1,7 +1,7 @@
 # import detect
 # import plate
 import rospy
-from geometry_msgs.msg import Point, Pose, PoseStamped, PointStamped
+from geometry_msgs.msg import Point, Pose, PoseStamped, PointStamped, Quaternion
 from sensor_msgs.msg import PointCloud2
 import sensor_msgs.point_cloud2 as pcl2
 import math
@@ -24,6 +24,130 @@ INFERENCE_Z = 20
 VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
 PLATE = True   # as a result makes plate texts DISABLED and skips recognizing plates.
+BOX_SIZE = 1.0   # change if you need a larger safety margin
+
+
+def first_open_point(target: Point,
+                     angle_offsets_list: list,
+                     box_size: float = BOX_SIZE) -> Point:
+    """
+    Return `target` if it is free of obstacles; otherwise iterate through
+    angle offsets (relative to the drone) and return the first candidate
+    point that is clear.
+
+    Args:
+        target (Point): Desired waypoint in world frame.
+        angle_offsets_list (list[dict]): e.g. [{'left':30}, {'left':30, 'up':15}]
+        box_size (float): Edge length (metres) for box_is_clear.
+
+    Returns:
+        Point: The chosen open point (target itself or the first fallback).
+               If none are clear, the original target is returned.
+    """
+    # 1) Quick check: is target already clear?
+    if box_is_clear(target, box_size):
+        return target
+
+    # 2) Get current drone pose (world frame)
+    pose = get_current_pose()
+    if pose is None:
+        rospy.logwarn("Drone pose unavailable; returning original target.")
+        return target
+
+    pos = pose.position
+    ori = pose.orientation
+
+    # 3) Distance from drone to target (used for all probes)
+    dx, dy, dz = target.x - pos.x, target.y - pos.y, target.z - pos.z
+    distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+    # 4) Try each angular offset in order
+    for offsets in angle_offsets_list:
+        probe = point_at_angular_offset(pos, ori, distance, offsets)
+        if box_is_clear(probe, box_size):
+            return probe  # first clear candidate wins
+
+    # 5) Nothing was clear — fall back to original target
+    rospy.logwarn("No open fallback found; using original target.")
+    return target
+
+def point_at_angular_offset(position: Point,
+                            orientation: Quaternion,
+                            distance: float,
+                            angle_offsets: dict) -> Point:
+    """
+    Return a point lying `distance` metres from `position` in the direction
+    obtained by applying the given angular offsets to the drone's forward axis.
+
+    Args:
+        position (Point):    Drone position in world frame.
+        orientation (Quaternion): Drone orientation (x,y,z,w).
+        distance (float):    Radius of the sphere (metres).
+        angle_offsets (dict): e.g. {'left':30, 'up':15}.  Keys may be:
+                              'left', 'right', 'up', 'down'.
+                              Values are degrees (positive).
+
+    Returns:
+        Point: Target location in world frame.
+
+    Notes:
+        • At most one yaw key ('left' or 'right') and one pitch key
+          ('up' or 'down') will be honoured; extras are ignored.
+        • Drone is assumed level (roll = 0), matching your requirement.
+    """
+    # Basis axes in body frame ---------------------------------------------
+    fwd_body   = (1.0, 0.0, 0.0)     # +X
+    up_body    = (0.0, 0.0, 1.0)     # +Z
+    right_body = (0.0, -1.0, 0.0)    # +Y (right is -Y)
+
+    # World-frame rotation matrix from quaternion --------------------------
+    R = tft.quaternion_matrix([orientation.x,
+                               orientation.y,
+                               orientation.z,
+                               orientation.w])[:3, :3]
+
+    # Helper to build axis-angle rotation matrices -------------------------
+    def rot_from(key: str, deg: float):
+        rad = math.radians(deg)
+        if key == 'left':
+            axis = R.dot(up_body)    # yaw about up (+Z)  left = +rad
+            return tft.rotation_matrix(+rad, axis)[:3, :3]
+        if key == 'right':
+            axis = R.dot(up_body)
+            return tft.rotation_matrix(-rad, axis)[:3, :3]
+        if key == 'up':
+            axis = R.dot(right_body) # pitch about right axis  up = +rad
+            return tft.rotation_matrix(+rad, axis)[:3, :3]
+        if key == 'down':
+            axis = R.dot(right_body)
+            return tft.rotation_matrix(-rad, axis)[:3, :3]
+        raise ValueError(f"Invalid key '{key}'")
+
+    # Build composite rotation --------------------------------------------
+    R_total = tft.identity_matrix()[:3, :3]
+
+    # Apply yaw first, then pitch (fixed, intuitive order)
+    for key in ('left', 'right'):
+        if key in angle_offsets:
+            R_total = rot_from(key, angle_offsets[key]).dot(R_total)
+            break  # only one yaw key allowed
+
+    for key in ('up', 'down'):
+        if key in angle_offsets:
+            R_total = rot_from(key, angle_offsets[key]).dot(R_total)
+            break  # only one pitch key allowed
+
+    # Rotate drone's forward vector ----------------------------------------
+    fwd_world = R.dot(fwd_body)
+    offset_dir = R_total.dot(fwd_world)
+
+    # Scale & translate ----------------------------------------------------
+    goal = Point()
+    goal.x = position.x + distance * offset_dir[0]
+    goal.y = position.y + distance * offset_dir[1]
+    goal.z = position.z + distance * offset_dir[2]
+    return goal
+
 
 
 def box_is_clear(target_pt: Point, box_size: float, pc_timeout: float = 1.0) -> bool:
@@ -581,7 +705,22 @@ if __name__ == "__main__":
     # rotateDrone(90)
     # simpleMove(Point(0, 0, 3))
     # print(box_is_clear(Point(-5, 0, 1), 1, 1))
-    simpleMove(Point(2, -2, 6))
+    
+    # print(point_at_angular_offset(
+    #     Point(0, 0, 1), 
+    #     Quaternion(x=0.0, y=0.0, z=0.0, w=1.0),
+    #     2, {"up": 90, "left": 90}
+    # ))
+    
+    fallback_angles = [
+        {'left': 30},                     # 30° left
+        {'right': 30},                    # 30° right
+        {'left': 45, 'up': 15},           # up-left diagonal
+        {'right': 45, 'up': 15},          # up-right diagonal
+    ]
+
+    safe_point = first_open_point(Point(2, 0, 1), fallback_angles)
+    simpleMove(safe_point)
 
     # resetPlates()
     # resetPhotos()
