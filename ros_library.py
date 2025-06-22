@@ -18,7 +18,7 @@ import tf2_geometry_msgs
 # import mmrotate
 
 EPS = 0.5
-MAX_DIST = 5.0  # Maximum distance for each step
+MAX_DIST = 0.5  # Maximum distance for each step
 INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
@@ -169,19 +169,44 @@ def stepMove(target_point: Point):
     rospy.loginfo("Arrived at target using stepMove.")
 
 
-def simpleMove(point: Point):
+def simpleMove(point: Point, server=False):
     """
     Publishes a PoseStamped message to a ROS topic and waits until the robot arrives at the target point.
+    The drone will face the target point before moving.
 
     Args:
         point (Point): The target point to move to.
     """
+    # Get current drone position
+    current_pose = get_current_pose()
+    if current_pose is None:
+        rospy.logerr("Current pose unavailable. Aborting simpleMove.")
+        return
+
+    current_position = current_pose.position
+
+    # Calculate angle to target point
+    dx = point.x - current_position.x
+    dy = point.y - current_position.y
+    angle_to_target = math.atan2(dy, dx)
+
+    # Rotate drone to face the target point
+    rospy.loginfo(f"Rotating drone to face target point at angle {math.degrees(angle_to_target):.2f} degrees.")
+    stepRotateDrone(math.degrees(angle_to_target), relative=False)
+    
+    # Get current pose after rotation
+    current_pose = get_current_pose()
+    if current_pose is None:
+        rospy.logerr("Current pose unavailable. Aborting simpleMove.")
+        return
+
+    # Publish PoseStamped message to move to the target point
     pub = rospy.Publisher('/firefly/command/pose', PoseStamped, queue_size=10)
     pose_stamped = PoseStamped()
     pose_stamped.header.stamp = rospy.Time.now()
-    pose_stamped.header.frame_id = "map"
+    pose_stamped.header.frame_id = "world"
     pose_stamped.pose.position = point
-    pose_stamped.pose.orientation.w = 1.0
+    pose_stamped.pose.orientation = current_pose.orientation 
 
     rospy.loginfo(f"Publishing target pose:\n{point}")
 
@@ -208,7 +233,9 @@ def simpleMove(point: Point):
 
     rospy.loginfo("Robot has arrived at the target point.")
     sub.unregister()
-    send_position_to_flask()
+    
+    if server:
+        send_position_to_flask()
 
 
 def convertNavDataToWaypoints(navData):
@@ -372,7 +399,7 @@ def inferenceImages():
 
     return coords
 
-def rotateDrone(degrees):
+def rotateDrone(degrees, relative=True):
     """
     Rotates the drone in place by 'degrees' (relative to its current heading).
     No persistence in future commands (once complete, orientation remains changed).
@@ -391,8 +418,12 @@ def rotateDrone(degrees):
     roll, pitch, yaw = euler_from_quaternion(q)
 
     # Calculate new orientation
-    new_yaw = yaw + math.radians(degrees)
-    new_q = quaternion_from_euler(roll, pitch, new_yaw)
+    if relative:
+        new_yaw = yaw + math.radians(degrees)
+        new_q = quaternion_from_euler(roll, pitch, new_yaw)
+    else:
+        new_yaw = math.radians(degrees)
+        new_q = quaternion_from_euler(roll, pitch, new_yaw)
 
     if new_yaw >= math.radians(360):
         new_yaw -= math.radians(360)
@@ -400,7 +431,7 @@ def rotateDrone(degrees):
     # Build a PoseStamped with same position but updated orientation
     pose_stamped = PoseStamped()
     pose_stamped.header.stamp = rospy.Time.now()
-    pose_stamped.header.frame_id = "map"
+    pose_stamped.header.frame_id = "world"
     pose_stamped.pose.position = current_pose.position
     pose_stamped.pose.orientation.x = new_q[0]
     pose_stamped.pose.orientation.y = new_q[1]
@@ -429,18 +460,23 @@ def rotateDrone(degrees):
     rospy.loginfo("Drone rotation complete.")
 
 
-def stepRotateDrone(degrees, stepsize=90):
+def stepRotateDrone(degrees, stepsize=90, relative=True):
     
     if degrees < 0:
         stepsize *= -1
 
     if -90 <= degrees <= 90:
-        rotateDrone(degrees)
+        rotateDrone(degrees, relative)
     else:
         times_step = int(degrees // stepsize)
-        angles = [stepsize]*times_step + [degrees - stepsize*times_step]
+        if relative:
+            angles = [stepsize]*times_step + [degrees - stepsize*times_step]
+        else:
+            angles = [stepsize * i for i in range(1, int(times_step) + 1)]
+            if abs(degrees) % abs(stepsize) != 0:
+                angles.append(degrees)
         for x in angles:
-            rotateDrone(x)
+            rotateDrone(x, relative)
 
 
 # Fly over the car (for example (10,-8))
@@ -544,8 +580,8 @@ if __name__ == "__main__":
     rospy.init_node("navigation_node", anonymous=True)
     # rotateDrone(90)
     # simpleMove(Point(0, 0, 3))
-    print(box_is_clear(Point(-5, 0, 1), 1, 1))
-    # simpleMove(Point(1, 0, 1))
+    # print(box_is_clear(Point(-5, 0, 1), 1, 1))
+    simpleMove(Point(2, -2, 6))
 
     # resetPlates()
     # resetPhotos()
