@@ -19,13 +19,13 @@ import tf2_geometry_msgs
 # import mmrotate
 
 EPS = 0.5
-MAX_DIST = 0.5  # Maximum distance for each step
+MAX_DIST = 1.0  # Maximum distance for each step
 INFERENCE_THRESHOLD = 0.4
 INFERENCE_Z = 20
 VEHICLE_EPS = 5
 URL_POS = "http://localhost:5000/update_drone_position"  
 PLATE = True   # as a result makes plate texts DISABLED and skips recognizing plates.
-BOX_SIZE = 1.2   # change if you need a larger safety margin
+BOX_SIZE = 2.0   # change if you need a larger safety margin
 ROTATION_THRESHOLD = 0.2
 PUB_RATE_HZ        = 15  
 TIMEOUT_SEC        = 10  
