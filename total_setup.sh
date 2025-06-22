@@ -101,6 +101,10 @@ echo "$PLATEREC" >> .env
 cd ~/ros_project
 bash ./place_sim_files.sh
 
+# Silence TF warnings
+echo "export ROSCONSOLE_CONFIG_FILE=~/ros_project/rosconsole.config" >> ~/.bashrc
+source ~/.bashrc
+
 # Start gazebo (make sure it is running)
 roslaunch rotors_gazebo rotors_hovering_vi_extra_camera.launch mav_name:=firefly world_name:=test_city4
 

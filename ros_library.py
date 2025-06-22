@@ -27,6 +27,10 @@ PLATE = True   # as a result makes plate texts DISABLED and skips recognizing pl
 BOX_SIZE = 1.0   # change if you need a larger safety margin
 
 
+# Silence TF warnings
+os.environ['ROSCONSOLE_CONFIG_FILE'] = '/home/deneg/ros_project/rosconsole.config'
+
+
 def first_open_point(target: Point,
                      angle_offsets_list: list,
                      box_size: float = BOX_SIZE) -> Point:
