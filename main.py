@@ -41,17 +41,18 @@ ros_library.resetPhotos()
 ros_library.MAX_DIST = 10.0
 
 # Now visit and take photos of all the tiles
-points = [Point(tile["x"], tile["y"], data["height"]) for tile in data["tiles"]]
-ros_library.simpleNavigation(points, image=True)
+# points = [Point(tile["x"], tile["y"], data["height"]) for tile in data["tiles"]]
+# ros_library.simpleNavigation(points, image=True)
 
 # Only before avoidance
-ros_library.simpleNavigation([Point(0, 0, 80), Point(0, 0, 10)], image=False)
+ros_library.simpleNavigation([Point(0, 0, 80)], image=True)
+ros_library.simpleNavigation([Point(0, 0, 10)], image=False)
 
 detect.init()
 all_abs_coords = []
 for f in os.listdir("images"):
     detect.draw_detections_on_image(f, f"output/det_{f}")
-    abs_coords = detect.inference_with_absolute_coordinates(f)
+    abs_coords = detect.inference_with_absolute_coordinates(f, remove_repetations=True)
     abs_coords = convert_numpy(abs_coords)  # Convert before saving
     all_abs_coords.extend(abs_coords)
 

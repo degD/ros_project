@@ -2034,10 +2034,10 @@
       <pose>-12.15 -19.7 0 0 -0 0</pose>
     </model>
     <state world_name='default'>
-      <sim_time>1856 220000000</sim_time>
-      <real_time>534 30207481</real_time>
-      <wall_time>1750052281 247100644</wall_time>
-      <iterations>53255</iterations>
+      <sim_time>2550 340000000</sim_time>
+      <real_time>26 337616156</real_time>
+      <wall_time>1750663765 186662685</wall_time>
+      <iterations>2611</iterations>
       <model name='CarPlated1087'>
         <pose>10.7731 -7.19159 0 0 -0 0</pose>
         <scale>1 1 1</scale>
@@ -2069,30 +2069,30 @@
         </link>
       </model>
       <model name='CarPlated2371'>
-        <pose>-13.0308 10.2081 0 0 -0 0</pose>
+        <pose>-13.1353 3.92902 0 0 -0 0</pose>
         <scale>1 1 1</scale>
         <link name='link'>
-          <pose>-13.0308 10.2081 0 0 -0 0</pose>
+          <pose>-13.1353 3.92902 0 0 -0 0</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
       </model>
       <model name='CarPlated2657'>
-        <pose>-5.85453 10.5928 0 0 -0 0</pose>
+        <pose>-5.80945 5.59803 0 0 -0 0</pose>
         <scale>1 1 1</scale>
         <link name='link'>
-          <pose>-5.85453 10.5928 0 0 -0 0</pose>
+          <pose>-5.80945 5.59803 0 0 -0 0</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
       </model>
       <model name='CarPlated2870'>
-        <pose>5.08872 10.5347 0 0 -0 0</pose>
+        <pose>5.84238 7.83342 0 0 -0 0</pose>
         <scale>1 1 1</scale>
         <link name='link'>
-          <pose>5.08872 10.5347 0 0 -0 0</pose>
+          <pose>5.84238 7.83342 0 0 -0 0</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
@@ -2199,13 +2199,13 @@
         </link>
       </model>
       <model name='Dumpster'>
-        <pose>-8.64394 -11.8929 0.050974 -2e-06 -0.000102 -2.96831</pose>
+        <pose>-8.64387 -11.89 0.051415 -1e-06 -0.000736 -2.96975</pose>
         <scale>1 1 1</scale>
         <link name='link'>
-          <pose>-8.64394 -11.8929 0.050974 -2e-06 -0.000102 -2.96831</pose>
+          <pose>-8.64387 -11.89 0.051415 -1e-06 -0.000736 -2.96975</pose>
           <velocity>0 0 0 0 -0 0</velocity>
-          <acceleration>-1e-06 -0.000153 -0.0002 -1.7e-05 -0.00018 0.000176</acceleration>
-          <wrench>-1e-06 -0.000153 -0.0002 0 -0 0</wrench>
+          <acceleration>0.00032 -0.000171 -0.001307 0.001175 -0.001624 0.000578</acceleration>
+          <wrench>0.00032 -0.000171 -0.001307 0 -0 0</wrench>
         </link>
       </model>
       <model name='Fast Food'>
@@ -2454,7 +2454,7 @@
     </state>
     <gui fullscreen='0'>
       <camera name='user_camera'>
-        <pose>13.4825 -6.20864 13.8631 -0 1.3978 2.41599</pose>
+        <pose>1.37078 11.3764 0.720545 0 0.257959 1.58545</pose>
         <view_controller>orbit</view_controller>
         <projection_type>perspective</projection_type>
       </camera>
